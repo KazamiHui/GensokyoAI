@@ -1,0 +1,5 @@
+ollama
+msgspec
+loguru
+rich
+numpy

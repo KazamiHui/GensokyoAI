@@ -1,0 +1,46 @@
+# GenskoyoAI 默认配置
+
+# 日志配置
+log_level: INFO
+log_console: false
+log_file: "logs/genskoyai.log"
+
+# 模型配置
+model:
+  name: qwen3.5:9b
+  base_url: null
+  stream: true
+  think: false
+  temperature: 0.7
+  top_p: 0.9
+  max_tokens: 2048
+  timeout: 60
+
+# 记忆配置
+memory:
+  working_max_turns: 20
+  episodic_threshold: 50
+  episodic_summary_model: qwen3.5:9b
+  episodic_keep_recent: 10
+  semantic_enabled: true
+  semantic_embedding_model: qwen3.5:9b
+  semantic_top_k: 5
+  semantic_similarity_threshold: 0.7
+  auto_memory_enabled: true
+  auto_memory_model: qwen3.5:9b
+
+# 工具配置
+tool:
+  enabled: true
+  builtin_tools:
+    - time
+    - moon
+    - memory
+    - system
+  custom_tools_path: null
+
+# 会话配置
+session:
+  auto_save: true
+  save_path: ./sessions
+  max_sessions: 100
