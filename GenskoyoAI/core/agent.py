@@ -7,6 +7,7 @@ import signal
 import sys
 from contextvars import ContextVar
 from uuid import uuid4
+from concurrent.futures import ThreadPoolExecutor
 
 import ollama
 from ollama import Message, ChatResponse
@@ -353,6 +354,7 @@ class Agent:
         """调用模型（异步）- 带超时控制"""
         kwargs: dict = {
             "model": self.config.model.name,
+            "think": self.config.model.think,
             "messages": messages,
             "stream": False,
             "options": {
@@ -361,9 +363,6 @@ class Agent:
                 "num_predict": self.config.model.max_tokens,
             },
         }
-
-        if self.config.model.think:
-            kwargs["think"] = True
 
         if tools:
             kwargs["tools"] = tools
@@ -384,6 +383,7 @@ class Agent:
         """流式调用模型，返回流式迭代器"""
         kwargs: dict = {
             "model": self.config.model.name,
+            "think": self.config.model.think,
             "messages": messages,
             "stream": True,
             "options": {
@@ -393,14 +393,10 @@ class Agent:
             },
         }
 
-        if self.config.model.think:
-            kwargs["think"] = True
-
         if tools:
             kwargs["tools"] = tools
 
         try:
-            from concurrent.futures import ThreadPoolExecutor
 
             def run_stream():
                 for chunk in ollama.chat(**kwargs):
