@@ -1,8 +1,8 @@
 """异步事件总线"""
 
 import asyncio
-from typing import Callable, Any, Dict, List, Set, Optional
-from dataclasses import dataclass, field
+from typing import Callable, Any
+from msgspec import Struct, field
 from enum import Enum, auto
 from .exceptions import GenskoyoError
 
@@ -17,29 +17,33 @@ class EventPriority(Enum):
     LOWEST = auto()
 
 
-@dataclass
-class Event:
+class Event(Struct):
     """事件"""
 
     name: str
     data: Any = None
-    source: Optional[str] = None
+    source: str | None = None
 
 
-@dataclass
 class Subscription:
-    """订阅"""
+    """订阅 - 不能用 Struct 因为包含不可序列化的 Callable"""
 
-    handler: Callable
-    priority: EventPriority = EventPriority.NORMAL
-    once: bool = False
+    def __init__(
+        self,
+        handler: Callable,
+        priority: EventPriority = EventPriority.NORMAL,
+        once: bool = False,
+    ):
+        self.handler = handler
+        self.priority = priority
+        self.once = once
 
 
 class EventBus:
     """异步事件总线"""
 
     def __init__(self):
-        self._subscribers: Dict[str, List[Subscription]] = {}
+        self._subscribers: dict[str, list[Subscription]] = {}
         self._lock = asyncio.Lock()
 
     def subscribe(
@@ -77,7 +81,7 @@ class EventBus:
         ]
         return len(self._subscribers[event_name]) != original_len
 
-    async def publish(self, event: Event) -> List[Any]:
+    async def publish(self, event: Event) -> list[Any]:
         """发布事件"""
         if event.name not in self._subscribers:
             return []

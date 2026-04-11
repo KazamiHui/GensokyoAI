@@ -2,7 +2,7 @@
 
 import inspect
 from typing import Callable, Any, Optional, get_type_hints
-from dataclasses import dataclass
+from msgspec import Struct
 from enum import Enum
 
 
@@ -15,8 +15,7 @@ class ToolParameterType(Enum):
     OBJECT = "object"
 
 
-@dataclass
-class ToolParameter:
+class ToolParameter(Struct):
     """工具参数"""
 
     name: str
@@ -28,8 +27,7 @@ class ToolParameter:
     properties: Optional[dict] = None  # for object type
 
 
-@dataclass
-class ToolDefinition:
+class ToolDefinition(Struct):
     """工具定义"""
 
     name: str

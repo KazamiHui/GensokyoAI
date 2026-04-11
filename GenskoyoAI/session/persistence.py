@@ -13,11 +13,9 @@ from ..utils.logging import logger
 class SessionPersistence:
     """会话持久化"""
 
-    def __init__(self, base_path: Path):
-        logger.debug(
-            f"value the base_path is: {base_path}, type: {type(base_path).__name__}"
-        )
-        self.base_path = base_path
+    def __init__(self, base_path: Path | str):
+            
+        self.base_path = Path(base_path)
         self.base_path.mkdir(parents=True, exist_ok=True)
         self._lock = asyncio.Lock()
 

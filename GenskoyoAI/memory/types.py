@@ -1,13 +1,11 @@
 """记忆数据类"""
 
-from dataclasses import dataclass, field
+from msgspec import Struct, field
 from datetime import datetime
-from typing import Optional, List, Any
-from uuid import uuid4, UUID
+from uuid import uuid4
 
 
-@dataclass
-class MemoryRecord:
+class MemoryRecord(Struct):
     """基础记忆记录"""
 
     id: str = field(default_factory=lambda: str(uuid4()))
@@ -19,11 +17,10 @@ class MemoryRecord:
     metadata: dict = field(default_factory=dict)
 
 
-@dataclass
-class WorkingMemory:
+class WorkingMemory(Struct):
     """工作记忆 - 当前会话的完整对话"""
 
-    messages: List[dict] = field(default_factory=list)
+    messages: list[dict] = field(default_factory=list)
     max_turns: int = 20
 
     def add(self, role: str, content: str, **kwargs) -> None:
@@ -36,7 +33,7 @@ class WorkingMemory:
         if len(self.messages) > self.max_turns * 2:  # *2 因为 user+assistant
             self.messages = self.messages[-self.max_turns * 2 :]
 
-    def get_context(self) -> List[dict]:
+    def get_context(self) -> list[dict]:
         """获取上下文"""
         return self.messages.copy()
 
@@ -45,24 +42,22 @@ class WorkingMemory:
         self.messages.clear()
 
 
-@dataclass
-class EpisodicMemory:
+class EpisodicMemory(Struct):
     """情景记忆 - 历史摘要"""
 
     summary: str = ""
     start_time: datetime = field(default_factory=datetime.now)
-    end_time: Optional[datetime] = None
+    end_time: datetime | None = None
     message_count: int = 0
-    key_events: List[str] = field(default_factory=list)
+    key_events: list[str] = field(default_factory=list)
 
 
-@dataclass
-class SemanticMemory:
+class SemanticMemory(Struct):
     """语义记忆 - 向量化的知识片段"""
 
     id: str = field(default_factory=lambda: str(uuid4()))
     content: str = ""
-    embedding: Optional[List[float]] = None
+    embedding: list[float] | None = None
     importance: float = 0.0
-    tags: List[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
     timestamp: datetime = field(default_factory=datetime.now)

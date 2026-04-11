@@ -3,11 +3,11 @@
 import os
 from pathlib import Path
 from typing import Any
-from dataclasses import dataclass, field
+from msgspec import Struct, field
 from enum import Enum
 import yaml
 
-from ..utils.logging import setup_logging, logger
+from ..utils.logging import setup_logging
 
 
 class LogLevel(Enum):
@@ -17,8 +17,7 @@ class LogLevel(Enum):
     ERROR = "ERROR"
 
 
-@dataclass
-class ModelConfig:
+class ModelConfig(Struct):
     """模型配置"""
 
     name: str = "qwen3:14b"
@@ -31,8 +30,7 @@ class ModelConfig:
     timeout: int = 60
 
 
-@dataclass
-class MemoryConfig:
+class MemoryConfig(Struct):
     """记忆配置"""
 
     working_max_turns: int = 20
@@ -47,32 +45,28 @@ class MemoryConfig:
     auto_memory_model: str = "qwen3:14b"
 
 
-@dataclass
-class ToolConfig:
+class ToolConfig(Struct):
     """工具配置"""
 
     enabled: bool = True
-    builtin_tools: list[str] = field(
-        default_factory=lambda: ["time", "moon", "memory", "system"]
-    )
+    builtin_tools: list[str] = field(default_factory=lambda: ["time", "moon", "memory", "system"])
     custom_tools_path: Path | None = None
 
 
-@dataclass
-class SessionConfig:
+class SessionConfig(Struct):
     """会话配置"""
 
     auto_save: bool = True
-    save_path: Path = Path("./sessions")
+    save_path: Path = field(default_factory=lambda: Path("./sessions"))
     max_sessions: int = 100
-
+    
     def __post_init__(self):
-        if isinstance(self.save_path, str):
+        # 强制转换为 Path 对象
+        if not isinstance(self.save_path, Path):
             self.save_path = Path(self.save_path)
 
 
-@dataclass
-class CharacterConfig:
+class CharacterConfig(Struct):
     """角色配置"""
 
     name: str
@@ -82,8 +76,7 @@ class CharacterConfig:
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
-@dataclass
-class AppConfig:
+class AppConfig(Struct):
     """应用配置"""
 
     # 日志配置
@@ -102,7 +95,9 @@ class AppConfig:
     character_file: Path | None = None
 
     def __post_init__(self):
-        self.session.save_path.mkdir(parents=True, exist_ok=True)
+        # 确保保存路径存在
+        if self.session.save_path:
+            self.session.save_path.mkdir(parents=True, exist_ok=True)
 
         # 应用日志配置
         self._apply_logging_config()
@@ -175,6 +170,7 @@ class ConfigLoader:
 
     def _merge(self, base: AppConfig, override: AppConfig) -> AppConfig:
         """合并配置"""
+        # 使用 msgspec.structs.replace 或手动合并
         result = AppConfig()
 
         # 日志配置
@@ -189,10 +185,10 @@ class ConfigLoader:
         result.log_file = override.log_file or base.log_file
 
         # 其他配置
-        result.model = override.model or base.model
-        result.memory = override.memory or base.memory
-        result.tool = override.tool or base.tool
-        result.session = override.session or base.session
+        result.model = override.model if override.model != ModelConfig() else base.model
+        result.memory = override.memory if override.memory != MemoryConfig() else base.memory
+        result.tool = override.tool if override.tool != ToolConfig() else base.tool
+        result.session = override.session if override.session != SessionConfig() else base.session
         result.character = override.character or base.character
         result.character_file = override.character_file or base.character_file
 
@@ -208,8 +204,8 @@ class ConfigLoader:
             config.log_console = os.getenv("GENSKOYAI_LOG_CONSOLE").lower() == "true"  # type: ignore
         if os.getenv("GENSKOYAI_MEMORY_WORKING_TURNS"):
             config.memory.working_max_turns = int(
-                os.getenv("GENSKOYAI_MEMORY_WORKING_TURNS")
-            )  # type: ignore
+                os.getenv("GENSKOYAI_MEMORY_WORKING_TURNS")  # type: ignore
+            )
         return config
 
     def load_character(self, path: Path) -> CharacterConfig:
