@@ -1,6 +1,7 @@
 """控制台后端 - 集成 Rich 美化"""
 
 from typing import Callable
+import asyncio
 
 from rich.console import Console as RichConsole
 from rich.prompt import Prompt
@@ -29,7 +30,7 @@ class ConsoleBackend(BaseBackend):
         self.cmd_parser = CommandParser(mode="smart")
         self.cmd_handler = CommandHandler(self.cmd_parser)
 
-        # 注册命令处理器（可扩展！）
+        # 注册命令处理器
         self._register_system_commands()
         self._register_chat_commands()
         self._register_prompt_commands()
@@ -49,7 +50,7 @@ class ConsoleBackend(BaseBackend):
         # 累积的提示词上下文
         self._prompt_context: list[str] = []
 
-    # ==================== 命令注册（可扩展） ====================
+    # ==================== 命令注册 ====================
 
     def _register_system_commands(self) -> None:
         """注册系统命令"""
@@ -88,17 +89,10 @@ class ConsoleBackend(BaseBackend):
         aliases: list[str] | None = None,
         description: str = "",
     ) -> "ConsoleBackend":
-        """注册自定义命令（可扩展接口）
-
-        Example:
-            backend.register_command("moon", lambda cmd: get_moon_phase(),
-                                   CommandType.CHAT, ["月相"], "查询月相")
-        """
-        # 注册到解析器
+        """注册自定义命令"""
         self.cmd_parser.register_tag(name, aliases, cmd_type, description, handler)
         self.cmd_parser.register_prefix(name, aliases, cmd_type, description, handler)
 
-        # 注册到处理器
         self.cmd_handler.register(name, handler, cmd_type)
         for alias in aliases or []:
             self.cmd_handler.register(alias, handler, cmd_type)
@@ -144,7 +138,7 @@ class ConsoleBackend(BaseBackend):
 
     def _cmd_exit(self, cmd: ParsedCommand) -> str:
         """退出命令"""
-        self._print_system_message("再见！", style="error")
+        self._print_system_message("正在保存数据，再见！", style="info")
         self._running = False
         return "__EXIT__"
 
@@ -157,7 +151,7 @@ class ConsoleBackend(BaseBackend):
     def _cmd_new(self, cmd: ParsedCommand) -> str:
         """新会话命令"""
         session = self.agent.create_session()
-        self._prompt_context.clear()  # 清空提示词上下文
+        self._prompt_context.clear()
         self._print_success_message(
             f"已创建新会话: {format_session_id(session.session_id)}"
         )
@@ -167,7 +161,7 @@ class ConsoleBackend(BaseBackend):
 
     def _cmd_save(self, cmd: ParsedCommand) -> str:
         """保存命令"""
-        self.agent.session_manager.save_current()
+        self.agent._sync_save()
         self._print_success_message("会话已保存")
         return ""
 
@@ -204,31 +198,26 @@ class ConsoleBackend(BaseBackend):
     # ==================== 聊天命令处理器 ====================
 
     def _cmd_think(self, cmd: ParsedCommand) -> str:
-        """内心独白"""
         if content := cmd.get_text():
             self.console.print(f"[dim italic]💭 {content}[/]")
         return ""
 
     def _cmd_whisper(self, cmd: ParsedCommand) -> str:
-        """悄悄话"""
         if content := cmd.get_text():
             self.console.print(f"[dim]🤫 悄悄话: {content}[/]")
         return ""
 
     def _cmd_ooc(self, cmd: ParsedCommand) -> str:
-        """场外发言"""
         if content := cmd.get_text():
             self.console.print(f"[yellow]🎭 OOC: {content}[/]")
         return ""
 
     def _cmd_describe(self, cmd: ParsedCommand) -> str:
-        """描述场景"""
         if content := cmd.get_text():
             self.console.print(f"[cyan]📖 {content}[/]")
         return ""
 
     def _cmd_action(self, cmd: ParsedCommand) -> str:
-        """执行动作"""
         if content := cmd.get_text():
             self.console.print(f"[green]⚡ {content}[/]")
         return ""
@@ -236,7 +225,6 @@ class ConsoleBackend(BaseBackend):
     # ==================== 提示词命令处理器 ====================
 
     def _cmd_know(self, cmd: ParsedCommand) -> str:
-        """知识/参考资料"""
         if content := cmd.get_text():
             self._prompt_context.append(f"【参考资料】\n{content}")
             self._print_success_message(f"已添加参考资料 ({len(content)} 字符)")
@@ -246,7 +234,6 @@ class ConsoleBackend(BaseBackend):
         return ""
 
     def _cmd_meta(self, cmd: ParsedCommand) -> str:
-        """元数据/场景"""
         if content := cmd.get_text():
             self._prompt_context.append(f"【场景设定】\n{content}")
             self._print_success_message(f"已添加场景设定 ({len(content)} 字符)")
@@ -256,7 +243,6 @@ class ConsoleBackend(BaseBackend):
         return ""
 
     def _cmd_attention(self, cmd: ParsedCommand) -> str:
-        """提醒/纠正"""
         if content := cmd.get_text():
             self._prompt_context.append(f"【重要提醒】\n{content}")
             self._print_success_message(f"已添加提醒 ({len(content)} 字符)")
@@ -270,7 +256,7 @@ class ConsoleBackend(BaseBackend):
         if not self._prompt_context:
             return user_message
 
-        context_text = "\n\n".join(self._prompt_context[-5:])  # 最多保留5条
+        context_text = "\n\n".join(self._prompt_context[-5:])
         return f"{context_text}\n\n【用户消息】\n{user_message}"
 
     # ==================== 核心方法 ====================
@@ -331,7 +317,7 @@ class ConsoleBackend(BaseBackend):
 
     async def send(self, message: str) -> str:
         """发送消息并获取回复"""
-        if not self._running:
+        if not self._running or self.agent.is_shutting_down:
             return ""
 
         # 处理命令
@@ -370,6 +356,8 @@ class ConsoleBackend(BaseBackend):
 
         try:
             async for chunk in self.agent.send_stream(message):
+                if self.agent.is_shutting_down:
+                    break
                 if chunk.is_tool_call and chunk.tool_info:
                     self._print_tool_call_indicator(chunk.tool_info)
                 else:
@@ -388,6 +376,8 @@ class ConsoleBackend(BaseBackend):
                     if self._stream_handler:
                         self._stream_handler(chunk.content)
 
+        except asyncio.CancelledError:
+            logger.debug("流式输出被取消")
         except Exception as e:
             logger.error(f"流式输出错误: {e}")
             error_msg = f"[错误] {e}"
@@ -481,9 +471,12 @@ class ConsoleBackend(BaseBackend):
         self.console.print(
             "[dim]💡 输入 [/][bold cyan]<cmd>help</cmd>[/] [dim]查看所有命令[/]"
         )
+        self.console.print(
+            "[dim]💡 按 Ctrl+C 安全退出（会自动保存）[/]\n"
+        )
 
         try:
-            while self._running:
+            while self._running and not self.agent.is_shutting_down:
                 try:
                     user_input = Prompt.ask(f"[{self.colors['user']}]你[/]")
 
@@ -497,13 +490,15 @@ class ConsoleBackend(BaseBackend):
 
                 except KeyboardInterrupt:
                     self.console.print("\n")
-                    self._print_system_message("用户中断", style="error")
+                    self._print_system_message("正在保存数据...", style="info")
                     break
                 except EOFError:
                     break
 
         finally:
+            self._print_system_message("正在保存会话数据...", style="info")
             await self.stop()
+            self._print_success_message("数据已保存，再见！")
 
 
 class ConsoleBackendBuilder:
