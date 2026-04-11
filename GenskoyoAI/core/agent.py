@@ -269,9 +269,11 @@ class Agent:
         """同步保存（确保数据写入磁盘）"""
         try:
             if self.config.session.auto_save:
-                self.session_manager.save_working_memory()
-                self.session_manager.save_current()
-                logger.info(f"已保存会话数据 (轮数: {len(self.working_memory) // 2})")
+                current = self.session_manager.get_current_session()
+                if current:  # 添加检查
+                    self.session_manager.save_working_memory()
+                    self.session_manager.save_current()
+                    logger.info(f"已保存会话数据 (轮数: {len(self.working_memory) // 2})")
         except Exception as e:
             logger.error(f"保存数据时出错: {e}")
 
