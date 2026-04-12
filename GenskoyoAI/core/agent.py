@@ -167,7 +167,10 @@ class Agent:
 
     def _build_system_prompt(self) -> str:
         """构建系统提示词"""
-        prompt = safe_get(self.config, "character.system_prompt", "")
+        if not self.config.character:
+            raise AgentError("No Character be roleplayed.")
+        
+        prompt = self.config.character.system_prompt
 
         # 添加工具说明
         if self.config.tool.enabled and (tools := self.tool_registry.list()):
@@ -175,6 +178,11 @@ class Agent:
             tools_desc += "\n".join(f"- {t.name}: {t.description}" for t in tools)
             prompt += tools_desc
             prompt += "\n当需要获取外部信息时，请调用相应的工具。调用工具后，将结果整合到回复中。"
+            
+        if metadata := self.config.character.metadata:
+            prompt += "\n\n【角色档案】\n"
+            for key, value in metadata.items():
+                prompt += f"- {key}: {value}\n"
 
         return prompt
 
