@@ -17,27 +17,6 @@ class CommandType(Enum):
     CUSTOM = auto()  # 自定义命令
     NONE = auto()  # 不是命令
 
-
-class ParsedCommand(Struct):
-    """解析后的命令"""
-
-    type: CommandType
-    name: str
-    content: str = ""  # 标签内的完整内容
-    args: list[str] = field(default_factory=list)
-    raw: str = ""
-
-    _tag_def: TagDefinition | None = None
-
-    def define_tag(self, tag_def: TagDefinition) -> None:
-        """保存标签定义"""
-        self._tag_def = tag_def
-
-    def get_text(self) -> str:
-        """获取内容文本（content 或 args 拼接）"""
-        return self.content or " ".join(self.args)
-
-
 class TagDefinition:
     """标签定义"""
 
@@ -59,6 +38,28 @@ class TagDefinition:
     def all_names(self) -> list[str]:
         """所有可用名称"""
         return [self.name] + self.aliases
+
+class ParsedCommand(Struct):
+    """解析后的命令"""
+
+    type: CommandType
+    name: str
+    content: str = ""  # 标签内的完整内容
+    args: list[str] = field(default_factory=list)
+    raw: str = ""
+
+    _tag_def: TagDefinition | None = None
+
+    def define_tag(self, tag_def: TagDefinition) -> None:
+        """保存标签定义"""
+        self._tag_def = tag_def
+
+    def get_text(self) -> str:
+        """获取内容文本（content 或 args 拼接）"""
+        return self.content or " ".join(self.args)
+
+
+
 
 
 class CommandParser:
