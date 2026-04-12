@@ -17,6 +17,7 @@ class CommandType(Enum):
     CUSTOM = auto()  # 自定义命令
     NONE = auto()  # 不是命令
 
+
 class TagDefinition:
     """标签定义"""
 
@@ -39,6 +40,7 @@ class TagDefinition:
         """所有可用名称"""
         return [self.name] + self.aliases
 
+
 class ParsedCommand(Struct):
     """解析后的命令"""
 
@@ -57,9 +59,6 @@ class ParsedCommand(Struct):
     def get_text(self) -> str:
         """获取内容文本（content 或 args 拼接）"""
         return self.content or " ".join(self.args)
-
-
-
 
 
 class CommandParser:
