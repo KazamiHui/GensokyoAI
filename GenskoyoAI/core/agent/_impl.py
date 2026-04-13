@@ -355,16 +355,15 @@ class Agent:
             self.save_coordinator.reset()
             return True
         return False
+    
+    def save_session(self) -> None:
+        """ 保存当前会话 """
+        self._sync_save()
 
-    def shutdown(self) -> None:
+    async def shutdown(self) -> None:
         """关闭 Agent"""
         # 创建异步任务执行关闭
-        try:
-            loop = asyncio.get_running_loop()
-            loop.create_task(self.lifecycle.shutdown())
-        except RuntimeError:
-            # 没有运行中的事件循环，同步保存
-            self._sync_save()
+        await self.lifecycle.shutdown()
 
         logger.info("Agent 已关闭")
 

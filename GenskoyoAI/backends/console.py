@@ -4,6 +4,7 @@
 
 from typing import Callable
 import asyncio
+import traceback
 
 from rich.console import Console as RichConsole
 from rich.prompt import Prompt
@@ -163,7 +164,7 @@ class ConsoleBackend(BaseBackend):
 
     def _cmd_save(self, cmd: ParsedCommand) -> str:
         """保存命令"""
-        self.agent.session_handler.sync_save_current()
+        self.agent.save_session()
         self._print_success_message("会话已保存")
         return ""
 
@@ -383,7 +384,7 @@ class ConsoleBackend(BaseBackend):
         except Exception as e:
             logger.error(f"流式输出错误: {e}")
             error_msg = f"[错误] {e}"
-            self.console.print(f"\n{error_msg}", style=self.colors["error"])
+            self._print_error_message(error_msg)
             if not full_response:
                 full_response = error_msg
 
@@ -453,7 +454,7 @@ class ConsoleBackend(BaseBackend):
     async def stop(self) -> None:
         """停止"""
         self._running = False
-        self.agent.shutdown()
+        await self.agent.shutdown()
         logger.info("控制台后端已停止")
 
     def set_stream_handler(self, handler: Callable | None) -> None:
