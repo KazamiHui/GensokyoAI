@@ -4,7 +4,6 @@
 
 from typing import Callable
 import asyncio
-import traceback
 
 from rich.console import Console as RichConsole
 from rich.prompt import Prompt
@@ -17,6 +16,15 @@ from ..utils.logging import logger
 from ..utils.formatters import format_session_id, format_datetime
 from ..utils.helpers import safe_get
 from ..utils.cmd_parser import CommandParser, CommandHandler, ParsedCommand, CommandType
+
+ART = r"""
+    ________                 __                    ___    ______
+   / ____/ /__  ____  _____ / /__  ____  __  __   /   |  /  _/ /
+  / / __/ / _ \/ __ \/ ___// //_/ / __ \/ / / /  / /| |  / // / 
+ / /_/ / /  __/ / / (__  )/ ,<   / /_/ / /_/ /  / ___ |_/ // /  
+ \____/_/\___/_/ /_/____//_/|_|  \____/\__, /  /_/  |_/___/_/   
+                                       /____/                    
+"""
 
 
 class ConsoleBackend(BaseBackend):

@@ -76,7 +76,7 @@ pip install -r requirements.txt
 
 ```bash
 # 对话模型
-ollama pull qwen3:9b
+ollama pull qwen3.5:9b
 
 # Embedding 模型（用于语义记忆）
 ollama pull nomic-embed-text
