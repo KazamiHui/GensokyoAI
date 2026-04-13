@@ -65,7 +65,7 @@
 
 ```bash
 # 克隆仓库
-git clone https://github.com/yourname/GenskoyoAI.git
+git clone https://github.com/Patchouli-CN/GenskoyoAI.git
 cd GenskoyoAI
 
 # 安装依赖

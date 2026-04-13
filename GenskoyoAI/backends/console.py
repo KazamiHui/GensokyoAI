@@ -286,20 +286,50 @@ class ConsoleBackend(BaseBackend):
         """显示欢迎面板"""
         character_name = safe_get(self.agent.config, "character.name", "Unknown")
 
-        panel_content = Text()
-        panel_content.append("幻想乡 AI 角色扮演引擎\n", style="bold magenta")
-        panel_content.append(f"当前角色: {character_name}\n", style="cyan")
-        panel_content.append("\n")
-        panel_content.append("提示词标签: ", style="dim")
-        panel_content.append("<know> ", style="bold magenta")
-        panel_content.append("<meta> ", style="bold magenta")
-        panel_content.append("<attention>\n", style="bold magenta")
-        panel_content.append("输入 ", style="dim")
-        panel_content.append("<cmd>help</cmd> ", style="bold cyan")
-        panel_content.append("查看所有命令\n", style="dim")
+        # 构建艺术字 - 上半部分红色，下半部分白色
+        art_text = Text()
+        lines = ART.strip('\n').split('\n')
+        
+        for i, line in enumerate(lines):
+            if i < 3:  # 上半部分（Gens）
+                art_text.append(line + "\n", style="bold red")
+            elif i < 5:  # 中间部分（kyo）
+                art_text.append(line + "\n", style="bold #FF6666")  # 浅红过渡
+            else:  # 下半部分（AI）
+                art_text.append(line + "\n", style="bold white")
+        
+        art_text.append(" ☯", style="bold yellow")
 
+        # 构建信息内容
+        info_text = Text()
+        info_text.append("\n")
+        info_text.append("✨ 幻想乡 AI 角色扮演引擎 ✨\n", style="bold magenta")
+        info_text.append(f"🌸 当前角色: ", style="dim")
+        info_text.append(f"{character_name}\n", style="bold cyan")
+        info_text.append("─" * 40 + "\n", style="dim")
+        info_text.append("\n")
+        info_text.append("📌 提示词标签: ", style="dim")
+        info_text.append("<know> ", style="bold #FF9999")
+        info_text.append("<meta> ", style="bold #FF9999")
+        info_text.append("<attention>\n", style="bold #FF9999")
+        info_text.append("⌨️  输入 ", style="dim")
+        info_text.append("<cmd>help</cmd> ", style="bold cyan")
+        info_text.append("查看所有命令\n", style="dim")
+
+        # 合并艺术字和信息
+        full_content = Text()
+        full_content.append(art_text)
+        full_content.append(info_text)
+
+        # 显示面板
         self.console.print(
-            Panel(panel_content, title="✨ 欢迎 ✨", border_style="magenta")
+            Panel(
+                full_content,
+                title="☯ 幻想乡 ☯",
+                subtitle="☯ 红白巫女为您服务 ☯",
+                border_style="red",
+                padding=(1, 2)
+            )
         )
 
     def _show_sessions_panel(self, sessions: list) -> None:
