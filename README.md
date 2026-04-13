@@ -72,25 +72,11 @@ cd GenskoyoAI
 pip install -r requirements.txt
 ```
 
-<details>
-<summary><b>📋 requirements.txt 内容</b></summary>
-
-```txt
-ollama>=0.1.0
-msgspec>=0.18.0
-rich>=13.0.0
-loguru>=0.7.0
-ayafileio>=0.1.0
-numpy>=1.24.0
-pyyaml>=6.0
-```
-</details>
-
 ### 下载模型
 
 ```bash
-# 对话模型（推荐 qwen2.5 系列，中文效果好）
-ollama pull qwen2.5:7b
+# 对话模型
+ollama pull qwen3:9b
 
 # Embedding 模型（用于语义记忆）
 ollama pull nomic-embed-text
