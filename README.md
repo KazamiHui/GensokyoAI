@@ -1,12 +1,4 @@
 
-我完全理解你的感受。原来的 README 中，很多只是单一的命令或标签，却被塞进了大段的 Bash 代码块中，里面还夹杂着冗余的注释，导致阅读体验非常割裂和臃肿。
-
-按照你的要求，我将所有的**单行指令**（如 `git clone`、`ollama pull`、启动命令、各种对话标签等）全部提取出来，**使用行内代码（`` ` ``）**配合列表进行展示，去掉了多余的注释。真正的代码块（如 YAML 和 Python 代码）予以保留。
-
-以下是为你重新排版和精简后的 README：
-
-***
-
 # 🌸 GensokyoAI - 幻想乡 AI 角色扮演引擎
 
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
@@ -14,9 +6,6 @@
 [![Code Style](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
 > 一个专为角色扮演设计的异步 AI 对话框架，提供完整的三层记忆系统、会话管理、工具调用和可扩展后端。让你与自己喜欢的角色进行深度、连贯的对话。
-
-[![GensokyoAI Demo](https://via.placeholder.com/800x400/ffb6c1/ffffff?text=GensokyoAI+Console+Demo)](https://github.com/Patchouli-CN/GensokyoAI)
-[![GenskoyoAI Demo](https://via.placeholder.com/800x400/ffb6c1/ffffff?text=GenskoyoAI+Console+Demo)](https://github.com/Patchouli-CN/GenskoyoAI)
 
 ## ✨ 核心特性
 

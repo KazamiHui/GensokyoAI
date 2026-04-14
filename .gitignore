@@ -11,6 +11,8 @@ sessions/
 
 logs/
 
+plans/
+
 # UV
 .venv/
 uv.lock
