@@ -1,4 +1,4 @@
-# 🌸 GenskoyoAI - 幻想乡 AI 角色扮演引擎
+# 🌸 GensokyoAI - 幻想乡 AI 角色扮演引擎
 
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
@@ -6,7 +6,7 @@
 
 > 一个专为角色扮演设计的异步 AI 对话框架，提供完整的三层记忆系统、会话管理、工具调用和可扩展后端。让你与自己喜欢的角色进行深度、连贯的对话。
 
-[![GenskoyoAI Demo](https://via.placeholder.com/800x400/ffb6c1/ffffff?text=GenskoyoAI+Console+Demo)](https://github.com/yourname/GenskoyoAI)
+[![GensokyoAI Demo](https://via.placeholder.com/800x400/ffb6c1/ffffff?text=GensokyoAI+Console+Demo)](https://github.com/Patchouli-CN/GensokyoAI)
 
 ## ✨ 核心特性
 
@@ -63,10 +63,31 @@
 
 ### 安装
 
+**方式一：使用 UV（推荐）**
+
+[UV](https://docs.astral.sh/uv/) 是一个极速的 Python 包管理器，推荐使用。
+
 ```bash
 # 克隆仓库
-git clone https://github.com/Patchouli-CN/GenskoyoAI.git
-cd GenskoyoAI
+git clone https://github.com/Patchouli-CN/GensokyoAI.git
+cd GensokyoAI
+
+# 安装 UV（如果尚未安装）
+# Windows
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+# macOS / Linux
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# 同步依赖（UV 会自动创建虚拟环境并安装所有依赖）
+uv sync
+```
+
+**方式二：使用 pip**
+
+```bash
+# 克隆仓库
+git clone https://github.com/Patchouli-CN/GensokyoAI.git
+cd GensokyoAI
 
 # 安装依赖
 pip install -r requirements.txt
@@ -100,6 +121,21 @@ example_dialogue:
 
 ### 启动对话
 
+**使用 UV 启动（推荐）：**
+
+```bash
+# 使用角色文件启动
+uv run main_v2.py --character characters/reimu.yaml --new-session
+
+# 恢复之前的会话
+uv run main_v2.py --character characters/reimu.yaml --resume <session_id>
+
+# 列出所有历史会话
+uv run main_v2.py --list-sessions
+```
+
+**使用 Python 启动：**
+
 ```bash
 # 使用角色文件启动
 python main_v2.py --character characters/reimu.yaml --new-session
@@ -110,6 +146,8 @@ python main_v2.py --character characters/reimu.yaml --resume <session_id>
 # 列出所有历史会话
 python main_v2.py --list-sessions
 ```
+
+> 💡 **提示：** Windows 用户也可以直接双击 `run_default.cmd`（pip 用户）或 `run_default_uv.cmd`（UV 用户）快速启动默认角色。
 
 ## 🎮 命令行参数
 
@@ -155,7 +193,7 @@ python main_v2.py --list-sessions
 ## 🏗️ 项目结构
 
 ```
-GenskoyoAI/
+GensokyoAI/
 ├── backends/           # 后端抽象与实现
 │   ├── base.py         # 抽象基类
 │   └── console.py      # Rich 控制台后端
@@ -202,7 +240,7 @@ GenskoyoAI/
 
 ```python
 import asyncio
-from GenskoyoAI import Agent, ConsoleBackendBuilder
+from GensokyoAI import Agent, ConsoleBackendBuilder
 
 async def main():
     # 创建 Agent
@@ -222,7 +260,7 @@ asyncio.run(main())
 ### 注册自定义工具
 
 ```python
-from GenskoyoAI.tools.base import tool
+from GensokyoAI.tools.base import tool
 
 @tool(description="获取幻想乡的天气")
 def get_gensokyo_weather(location: str = "博丽神社") -> str:
@@ -234,7 +272,7 @@ def get_gensokyo_weather(location: str = "博丽神社") -> str:
 ### 扩展自定义后端
 
 ```python
-from GenskoyoAI.backends import BaseBackend
+from GensokyoAI.backends import BaseBackend
 
 class WebBackend(BaseBackend):
     async def start(self):
@@ -252,10 +290,10 @@ class WebBackend(BaseBackend):
 
 | 变量名 | 说明 | 默认值 |
 |--------|------|--------|
-| `GENSKOYAI_MODEL` | 覆盖模型名称 | `qwen2.5:7b` |
-| `GENSKOYAI_LOG_LEVEL` | 日志级别 | `INFO` |
-| `GENSKOYAI_LOG_CONSOLE` | 控制台日志开关 | `true` |
-| `GENSKOYAI_MEMORY_WORKING_TURNS` | 工作记忆最大轮数 | `20` |
+| `GENSOKYOAI_MODEL` | 覆盖模型名称 | `qwen3.5:9b` |
+| `GENSOKYOAI_LOG_LEVEL` | 日志级别 | `INFO` |
+| `GENSOKYOAI_LOG_CONSOLE` | 控制台日志开关 | `true` |
+| `GENSOKYOAI_MEMORY_WORKING_TURNS` | 工作记忆最大轮数 | `20` |
 
 ## 🤝 贡献指南
 
@@ -288,7 +326,7 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 
 ## 🌟 Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=yourname/GenskoyoAI&type=Date)](https://star-history.com/#yourname/GenskoyoAI&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=Patchouli-CN/GensokyoAI&type=Date)](https://star-history.com/#Patchouli-CN/GensokyoAI&Date)
 
 ---
 
@@ -297,3 +335,4 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 *"只有华丽并不是魔法，弹幕最重要的是火力！" —— 雾雨魔理沙*
 
 ---
+
