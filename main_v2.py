@@ -66,7 +66,7 @@ async def main():
     if args.character:
         character_file = find_character_file(args.character)
 
-    # 创建 Agent
+    # 创建 Agent（会自动创建或加载会话）
     agent = Agent(config, config_file, character_file)
 
     # 会话管理
@@ -93,8 +93,11 @@ async def main():
         else:
             console.print(f"[red]会话不存在: {args.resume}[/]")
             return
-    elif args.new_session or not args.resume:
+    elif args.new_session:
+        # 🔧 只有显式指定 --new-session 时才创建新会话
         agent.create_session()
+        console.print("[green]已创建新会话[/]")
+    # 否则使用 Agent 初始化时自动创建/加载的会话
 
     # 构建并运行控制台后端
     backend = (
@@ -102,21 +105,13 @@ async def main():
         .with_stream_mode(not args.no_stream)
         .with_color_theme(
             {
-                # 用户输入：柔和的米白色
                 "user": "bold #f5e6d3",
-                # 幽幽子的回复：樱花粉（她的代表色）
                 "assistant": "bold #ffb7c5",
-                # 系统消息：淡紫色（冥界的薄雾）
                 "system": "dim #c9b1d4",
-                # 错误消息：深红色（彼岸花）
                 "error": "bold #c41e3a",
-                # 成功消息：淡绿色（春之气息）
                 "success": "bold #98d8a8",
-                # 信息消息：淡蓝色（亡灵蝶）
                 "info": "#a4cde0",
-                # 命令：淡紫色（蝴蝶）
                 "cmd": "bold #d4a0d4",
-                # 提示词：淡金色（樱花下的月光）
                 "prompt": "bold #ffe4a0",
             }
         )
