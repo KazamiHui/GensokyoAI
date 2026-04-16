@@ -63,12 +63,7 @@ class ConsoleBackend(BaseBackend):
     # ==================== 命令结果处理 ====================
 
     def _handle_command_results(self, results: list[CommandResult]) -> bool:
-        """
-        处理命令执行结果
-        
-        Returns:
-            True 如果应该退出程序
-        """
+        """处理命令执行结果，返回 True 表示应该退出"""
         for result in results:
             if result.status == CommandStatus.SUCCESS:
                 if result.message:
@@ -81,7 +76,6 @@ class ConsoleBackend(BaseBackend):
                     self._print_error_message(result.message)
             
             if result.should_exit:
-                self._print_system_message("正在保存数据，再见！", style="info")
                 self._running = False
                 return True
         
@@ -331,7 +325,6 @@ class ConsoleBackend(BaseBackend):
             self.colors[element] = color
 
     async def run_interactive(self) -> None:
-        """运行交互式对话循环"""
         await self.start()
 
         self.console.print(
@@ -339,6 +332,8 @@ class ConsoleBackend(BaseBackend):
         )
         self.console.print("[dim]💡 按 Ctrl+C 安全退出（会自动保存）[/]\n")
 
+        exited_normally = False
+        
         try:
             while self._running and not self.agent.is_shutting_down:
                 try:
@@ -350,17 +345,19 @@ class ConsoleBackend(BaseBackend):
                     result = await self.send(user_input)
 
                     if result == "__EXIT__":
+                        exited_normally = True
                         break
 
                 except KeyboardInterrupt:
                     self.console.print("\n")
-                    self._print_system_message("正在保存数据...", style="info")
+                    self._print_system_message("收到中断信号...", style="info")
                     break
                 except EOFError:
                     break
 
         finally:
-            self._print_system_message("正在保存会话数据...", style="info")
+            if not exited_normally:
+                self._print_system_message("正在保存会话数据...", style="info")
             await self.stop()
             self._print_success_message("数据已保存，再见！")
 

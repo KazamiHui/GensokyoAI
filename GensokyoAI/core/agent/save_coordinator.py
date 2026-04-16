@@ -133,7 +133,7 @@ class SaveCoordinator:
             self._bg_started = True
             logger.debug("后台管理器已启动")
 
-    async def save_async_if_needed(
+    async def save_async(
         self,
         working_memory: "WorkingMemoryManager",
     ) -> bool:

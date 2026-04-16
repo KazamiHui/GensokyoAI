@@ -47,7 +47,7 @@ async def cmd_new(ctx: CommandContext) -> CommandResult:
 @command(name="save", cmd_type=CommandType.SYSTEM, description="保存当前会话")
 async def cmd_save(ctx: CommandContext) -> CommandResult:
     """保存会话"""
-    ctx.agent_inst.save_session()
+    await ctx.agent_inst._async_save()
     return CommandResult.success("save", "会话已保存")
 
 

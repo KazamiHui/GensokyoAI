@@ -273,7 +273,7 @@ class ResponseHandler:
             self.record_assistant_message(message.content)
             await self.trigger_auto_memory(user_input, message.content)
 
-        await self._save_coordinator.save_async_if_needed(self._working_memory)
+        await self._save_coordinator.save_async(self._working_memory)
 
         return message
 
@@ -329,4 +329,4 @@ class ResponseHandler:
             self.record_assistant_message(full_content)
             await self.trigger_auto_memory(user_input, full_content)
 
-        await self._save_coordinator.save_async_if_needed(self._working_memory)
+        await self._save_coordinator.save_async(self._working_memory)

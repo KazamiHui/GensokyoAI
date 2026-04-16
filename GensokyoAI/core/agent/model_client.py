@@ -79,7 +79,6 @@ class ModelClient:
             "messages": messages,
             "tools": tools,
             "options": self._build_options(),
-            "stream": False,
         }
 
         # think 参数是可选的，只有支持 think 的模型才传
@@ -89,7 +88,7 @@ class ModelClient:
         try:
             logger.debug(f"非流式调用模型，消息数: {len(messages)}")
             response = await asyncio.wait_for(
-                self._client.chat(**kwargs),
+                self._client.chat(**kwargs, stream=False),
                 timeout=self.config.timeout,
             )
             logger.debug(f"模型响应完成，长度: {len(response.message.content or '')}")
@@ -126,7 +125,6 @@ class ModelClient:
             "messages": messages,
             "tools": tools,
             "options": self._build_options(),
-            "stream": True,
         }
 
         if hasattr(self.config, "think"):
@@ -134,7 +132,7 @@ class ModelClient:
 
         try:
             logger.debug(f"流式调用模型，消息数: {len(messages)}")
-            stream = await self._client.chat(**kwargs)
+            stream = await self._client.chat(**kwargs, stream=True)
 
             async for chunk in stream:
                 message = chunk.message
