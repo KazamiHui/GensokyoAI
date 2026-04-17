@@ -4,7 +4,7 @@
 
 import json
 import asyncio
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Any
 
 from ollama import Message
 
@@ -26,7 +26,7 @@ class ToolExecutor:
         """注入事件总线"""
         self._event_bus = event_bus
 
-    def parse_tool_calls(self, message: Message) -> list[dict]:
+    def parse_tool_calls(self, message: Message) -> list[dict[str, Any]]:
         """从 Message 对象解析工具调用"""
         if not message.tool_calls:
             return []
@@ -41,15 +41,25 @@ class ToolExecutor:
             )
         return parsed
 
-    async def execute(self, tool_call: dict) -> dict:
+    async def execute(self, tool_call: dict[str, Any]) -> dict[str, Any]:
         """执行单个工具调用"""
         name = tool_call.get("name")
         arguments = tool_call.get("arguments", {})
 
+        # 确保 name 是字符串
+        if not name or not isinstance(name, str):
+            error_msg = f"无效的工具名称: {name}"
+            logger.error(error_msg)
+            return {
+                "role": "tool",
+                "name": str(name) if name else "unknown",
+                "content": f"错误: {error_msg}",
+            }
+
         # 🆕 发布工具调用开始事件
         self._publish_tool_event("started", name, arguments)
 
-        tool_def = self._registry.get(name)  # type: ignore
+        tool_def = self._registry.get(name)
         if not tool_def:
             error_msg = f"工具 '{name}' 未找到"
             logger.warning(error_msg)
@@ -99,7 +109,7 @@ class ToolExecutor:
         self,
         status: str,
         name: str,
-        arguments: dict,
+        arguments: dict[str, Any],
         error: str | None = None,
         result: str | None = None,
     ) -> None:
@@ -116,7 +126,7 @@ class ToolExecutor:
         else:
             event_type = SystemEvent.TOOL_CALL_FAILED
 
-        data = {
+        data: dict[str, Any] = {
             "name": name,
             "arguments": arguments,
         }
@@ -133,18 +143,27 @@ class ToolExecutor:
             )
         )
 
-    async def execute_batch(self, tool_calls: list[dict]) -> list[dict]:
+    async def execute_batch(self, tool_calls: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """批量执行工具调用（并行）"""
         tasks = [self.execute(tc) for tc in tool_calls]
         results = await asyncio.gather(*tasks)
         return results
 
-    def execute_sync(self, tool_call: dict) -> dict:
+    def execute_sync(self, tool_call: dict[str, Any]) -> dict[str, Any]:
         """同步执行（兼容非异步环境）"""
         name = tool_call.get("name")
         arguments = tool_call.get("arguments", {})
 
-        tool_def = self._registry.get(name)  # type: ignore
+        if not name or not isinstance(name, str):
+            error_msg = f"无效的工具名称: {name}"
+            logger.error(error_msg)
+            return {
+                "role": "tool",
+                "name": str(name) if name else "unknown",
+                "content": f"错误: {error_msg}",
+            }
+
+        tool_def = self._registry.get(name)
         if not tool_def:
             return {
                 "role": "tool",
