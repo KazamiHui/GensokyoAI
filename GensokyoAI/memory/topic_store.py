@@ -295,7 +295,7 @@ class TopicAwareStore:
             name, summary = await self._generate_topic_info(content, model_client)
         else:
             name = f"话题{len(self._topics) + 1}"
-            summary = content[:50]
+            summary = content[:self.topic_config.summary_max_length]
 
         topic = Topic(
             name=name,
