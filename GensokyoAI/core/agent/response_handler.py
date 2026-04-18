@@ -161,7 +161,6 @@ class ResponseHandler:
 
     async def process_non_stream(
         self,
-        user_input: str,
         messages: list[dict[str, str]],
         tools: list[dict] | None,
     ) -> Message:
@@ -189,7 +188,6 @@ class ResponseHandler:
 
     async def process_stream(
         self,
-        user_input: str,
         messages: list[dict[str, str]],
         tools: list[dict] | None,
     ) -> AsyncIterator[StreamChunk]:
@@ -206,6 +204,7 @@ class ResponseHandler:
         """
         full_content = ""
         tool_calls_message: Message | None = None
+        first_round_content = ""  # 🆕 记录第一轮的内容
 
         # 第一轮：获取初始响应
         async for chunk in self._model_client.chat_stream(messages, tools):
@@ -214,6 +213,7 @@ class ResponseHandler:
             if chunk.is_tool_call and chunk.tool_info:
                 tool_calls_message = chunk.tool_info["message"]
             else:
+                first_round_content += chunk.content
                 full_content += chunk.content
             yield chunk
 
@@ -225,11 +225,25 @@ class ResponseHandler:
             if tool_results := await self.handle_tool_calls_from_message(tool_calls_message):
                 await self.record_tool_results(tool_results)
 
+                # 🆕 如果第一轮有部分内容，先记录下来
+                if first_round_content:
+                    self._working_memory.add_message("assistant", first_round_content)
+
                 # 继续对话
+                second_round_content = ""  # 🆕 记录第二轮的内容
                 async for chunk in self._continue_with_tool_results_stream():
                     if self._shutting_down:
                         break
+                    second_round_content += chunk.content
                     full_content += chunk.content
                     yield chunk
+
+                # 🆕 记录第二轮产生的助手消息
+                if second_round_content:
+                    self._working_memory.add_message("assistant", second_round_content)
+        else:
+            # 🆕 没有工具调用，直接记录第一轮的完整内容
+            if first_round_content:
+                self._working_memory.add_message("assistant", first_round_content)
 
         await self._save_coordinator.save_async(self._working_memory)

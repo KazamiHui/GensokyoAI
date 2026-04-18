@@ -67,8 +67,15 @@ def extract_exception(exctype, value, tb) -> list[str] | None:
     return tb_str
 
 
-def sys_excepthook(exctype, value, tb):
+def sys_excepthook(exctype: type[BaseException], value: BaseException, tb):
     # 获取异常信息并打印到控制台
+    if exctype in (KeyboardInterrupt, SystemExit):
+        # 静默处理，不打印 CRITICAL 日志
+        # 但如果是 SystemExit 且带有非零退出码，可以记录一下
+        if type(value) is SystemExit:
+            logger.warning(f"程序退出，退出码: {value.code}")
+        return
+    
     exception_info = extract_exception(exctype, value, tb)
     if exception_info:
         for exception_element in exception_info:
