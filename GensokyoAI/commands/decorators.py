@@ -5,7 +5,7 @@ import inspect
 from typing import Callable, Optional, get_type_hints
 from functools import wraps
 
-from ..utils.logging import logger
+from ..utils.logger import logger
 from .parser import CommandType  # 直接导入
 
 

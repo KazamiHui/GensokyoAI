@@ -2,7 +2,7 @@
 
 # GensokyoAI\utils\__init__.py
 
-from .logging import logger, setup_logging
+from .logger import logger, setup_logging
 from .exec_hook import set_exechook
 from .formatters import (
     format_session_id,

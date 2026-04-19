@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Optional, Any
 from ollama import Message
 
 from .registry import ToolRegistry
-from ..utils.logging import logger
+from ..utils.logger import logger
 
 if TYPE_CHECKING:
     from ..core.events import EventBus

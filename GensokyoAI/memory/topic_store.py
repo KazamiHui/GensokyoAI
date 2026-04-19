@@ -14,7 +14,7 @@ import msgspec
 import ayafileio
 
 from .types import Topic, TopicMemory
-from ..utils.logging import logger
+from ..utils.logger import logger
 from ..core.config import TopicGenerationConfig
 from ..core.agent.model_client import ModelClient
 

@@ -5,7 +5,7 @@
 import asyncio
 from typing import TYPE_CHECKING
 
-from ...utils.logging import logger
+from ...utils.logger import logger
 from ...background import BackgroundManager, TaskPriority
 
 if TYPE_CHECKING:

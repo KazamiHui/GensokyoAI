@@ -5,7 +5,7 @@
 from typing import Optional, TYPE_CHECKING
 
 from ..base import tool
-from ...utils.logging import logger
+from ...utils.logger import logger
 from ...core.events import Event, SystemEvent
 
 if TYPE_CHECKING:

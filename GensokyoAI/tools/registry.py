@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Optional, Callable
 
 from .base import ToolDefinition, list_tools, get_tool, tool
-from ..utils.logging import logger
+from ..utils.logger import logger
 
 
 class ToolRegistry:

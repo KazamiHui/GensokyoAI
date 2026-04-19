@@ -9,7 +9,7 @@ from datetime import datetime
 from .types import EpisodicMemory, MemoryRecord
 from ..core.config import MemoryConfig
 from ..core.exceptions import MemorySystemError
-from ..utils.logging import logger
+from ..utils.logger import logger
 from ..core.agent.model_client import ModelClient
 
 

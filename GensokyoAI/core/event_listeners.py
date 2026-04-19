@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 
 from .events import Event, SystemEvent, EventBus
 from ..memory.types import TopicMemory, TopicMemoryType
-from ..utils.logging import logger
+from ..utils.logger import logger
 
 if TYPE_CHECKING:
     from .agent import Agent

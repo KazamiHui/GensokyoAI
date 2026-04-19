@@ -9,7 +9,7 @@ from msgspec import Struct, field
 from enum import Enum
 import yaml
 
-from ..utils.logging import setup_logging
+from ..utils.logger import setup_logging
 
 
 class LogLevel(Enum):

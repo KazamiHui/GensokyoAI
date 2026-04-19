@@ -12,7 +12,7 @@ from rich.text import Text
 
 from ..base import BaseBackend
 from ...core.agent import Agent
-from ...utils.logging import logger
+from ...utils.logger import logger
 from ...utils.formatters import format_session_id, format_datetime
 from ...utils.helpers import safe_get
 from ...commands import CommandExecutor, CommandContext, CommandResult, CommandStatus, CommandType

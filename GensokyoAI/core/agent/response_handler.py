@@ -7,7 +7,7 @@ from typing import AsyncIterator, TYPE_CHECKING
 from ollama import Message, ChatResponse
 
 from .model_client import StreamChunk
-from ...utils.logging import logger
+from ...utils.logger import logger
 from ...utils.helpers import safe_get
 from ...memory.types import MemoryRecord
 

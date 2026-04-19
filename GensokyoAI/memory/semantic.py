@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Optional
 
 from .topic_store import TopicAwareStore
 from ..core.config import MemoryConfig
-from ..utils.logging import logger
+from ..utils.logger import logger
 
 if TYPE_CHECKING:
     from ..core.agent.model_client import ModelClient

@@ -14,7 +14,7 @@ from .types import (
 )
 from .workers import PersistenceWorker
 from .workers.base import BaseWorker
-from ..utils.logging import logger
+from ..utils.logger import logger
 
 
 class TaskContext:

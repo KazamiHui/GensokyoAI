@@ -6,7 +6,7 @@ from .context import SessionContext
 from .persistence import SessionPersistence
 from ..memory.working import WorkingMemoryManager
 from ..core.config import SessionConfig
-from ..utils.logging import logger
+from ..utils.logger import logger
 
 
 class SessionManager:

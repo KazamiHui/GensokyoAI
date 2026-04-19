@@ -1,7 +1,7 @@
 # GensokyoAI/commands/executor.py
 """命令执行器 - 无需类型转换"""
 
-from ..utils.logging import logger
+from ..utils.logger import logger
 from .parser import CommandParser, ParsedCommand, CommandType
 from .decorators import CommandDefinition, get_command, list_commands
 from .result import CommandResult, CommandStatus

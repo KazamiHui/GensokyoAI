@@ -32,7 +32,7 @@ from ...tools.executor import ToolExecutor
 from ...tools.tool_builtin.memory_tool import set_event_bus
 from ...session.manager import SessionManager
 from ...session.context import SessionContext
-from ...utils.logging import logger
+from ...utils.logger import logger
 from ...utils.helpers import safe_get
 from ...background import BackgroundManager, PersistenceWorker
 

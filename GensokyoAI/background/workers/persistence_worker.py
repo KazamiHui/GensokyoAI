@@ -6,7 +6,7 @@ import asyncio
 import time
 from typing import TYPE_CHECKING
 
-from ...utils.logging import logger
+from ...utils.logger import logger
 from ..types import BackgroundTask, TaskResult, PersistenceTaskData
 from .base import BaseWorker
 

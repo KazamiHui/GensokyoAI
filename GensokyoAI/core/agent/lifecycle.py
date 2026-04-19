@@ -8,7 +8,7 @@ import sys
 import signal as sig
 from typing import Callable, Awaitable
 
-from ...utils.logging import logger
+from ...utils.logger import logger
 from ...background.manager import BackgroundManager
 
 

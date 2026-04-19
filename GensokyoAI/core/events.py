@@ -8,7 +8,7 @@ from msgspec import Struct, field
 from uuid import uuid4
 import inspect
 
-from ..utils.logging import logger
+from ..utils.logger import logger
 
 
 class EventPriority(Enum):

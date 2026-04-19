@@ -9,7 +9,7 @@ from pathlib import Path
 import ayafileio
 
 from .context import SessionContext
-from ..utils.logging import logger
+from ..utils.logger import logger
 
 
 class SessionPersistence:

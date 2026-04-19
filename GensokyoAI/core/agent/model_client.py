@@ -13,7 +13,7 @@ from msgspec import Struct
 from ..config import ModelConfig
 from ..exceptions import ModelError
 from ..events import Event, SystemEvent, EventBus
-from ...utils.logging import logger
+from ...utils.logger import logger
 
 
 class StreamChunk(Struct):

@@ -7,7 +7,7 @@ import random
 from datetime import datetime, timedelta
 from typing import Optional, TYPE_CHECKING
 
-from ...utils.logging import logger
+from ...utils.logger import logger
 
 if TYPE_CHECKING:
     from ...memory.semantic import SemanticMemoryManager
