@@ -23,6 +23,7 @@ from ..event_listeners import (
     MetricsListeners,
     ErrorListeners,
     MemoryServiceListeners,
+    PersistenceListeners,
 )
 from ..exceptions import AgentError
 
@@ -121,6 +122,7 @@ class Agent:
         self.memory_service_listeners = MemoryServiceListeners(self, self.event_bus)
         self.metrics_listeners = MetricsListeners(self.event_bus)
         self.error_listeners = ErrorListeners(self.event_bus)
+        self.persistence_listeners = PersistenceListeners(self, self.event_bus)
         logger.debug("所有事件监听器已注册")
 
     def _inject_dependencies(self) -> None:
@@ -372,9 +374,7 @@ class Agent:
 
         self._action_executor.complete_response(full_response) # type: ignore
 
-        # 🆕 先记录到工作记忆
         if full_response:
-            self.working_memory.add_message("assistant", full_response)
             
             # 发布 MESSAGE_SENT 事件（让其他监听器知道）
             self.event_bus.publish(Event(
@@ -383,8 +383,6 @@ class Agent:
                 data={"content": full_response}
             ))
             
-            # 然后再保存
-            await self.save_coordinator.save_async(self.working_memory)
 
     async def _on_shutdown(self) -> None:
         self.event_bus.publish(Event(type=SystemEvent.AGENT_SHUTDOWN, source="agent"))

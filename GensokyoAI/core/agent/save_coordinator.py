@@ -17,12 +17,8 @@ if TYPE_CHECKING:
 class SaveCoordinator:
     """
     保存协调器 - 管理异步保存的去重和状态
-
-    职责：
-    - 判断是否应该保存（去重逻辑）
-    - 管理 pending 状态
-    - 提交保存任务到后台管理器
-    - 处理保存完成回调
+    
+    灵梦：保存这种事，能省则省，但不能不存~
     """
 
     def __init__(
@@ -30,103 +26,84 @@ class SaveCoordinator:
         session_manager: "SessionManager",
         session_config: "SessionConfig",
     ):
-        """
-        初始化保存协调器
-
-        Args:
-            session_manager: 会话管理器
-            session_config: 会话配置
-        """
         self._session_manager = session_manager
         self._session_config = session_config
 
-        # 去重状态
+        # 状态
+        self._last_saved_content_hash: str = ""  # 🆕 用内容哈希去重
         self._save_pending = False
         self._last_saved_turn = 0
 
-        # 后台管理器引用（延迟注入）
+        # 后台管理器引用
         self._background_manager: BackgroundManager | None = None
         self._bg_started = False
-
-        # 关闭状态（外部传入）
         self._shutting_down = False
 
     def set_background_manager(self, manager: BackgroundManager) -> None:
-        """注入后台管理器"""
         self._background_manager = manager
 
     def set_shutting_down(self, value: bool) -> None:
-        """设置关闭状态"""
         self._shutting_down = value
 
     @property
     def save_pending(self) -> bool:
-        """是否有保存任务 pending"""
         return self._save_pending
-
-    @property
-    def last_saved_turn(self) -> int:
-        """最后保存的轮数"""
-        return self._last_saved_turn
 
     def reset(self) -> None:
         """重置状态（新会话时调用）"""
         self._save_pending = False
         self._last_saved_turn = 0
+        self._last_saved_content_hash = ""
+
+    def _get_content_hash(self, working_memory: "WorkingMemoryManager") -> str:
+        """计算工作记忆内容的简单哈希"""
+        messages = working_memory.get_context()
+        # 用消息数量和最后一条内容作为简单哈希
+        if not messages:
+            return ""
+        last_msg = messages[-1]
+        return f"{len(messages)}:{last_msg.get('role', '')}:{last_msg.get('content', '')[:50]}"
 
     def should_save(self, working_memory: "WorkingMemoryManager", force: bool = False) -> bool:
         """
-        判断是否应该保存（去重）
-
-        Args:
-            working_memory: 工作记忆管理器
-            force: 是否强制保存（忽略去重逻辑）
-
-        Returns:
-            True 表示应该保存
+        判断是否应该保存
+        
+        魔理沙：重要的东西才值得保存DA☆ZE！
         """
-        # 强制保存或关闭时强制保存
         if force or self._shutting_down:
             return True
 
-        current_turn = len(working_memory) // 2
+        if not self._session_config.auto_save:
+            return False
 
-        # 如果没有新消息，不保存
+        current_turn = len(working_memory) // 2
+        
+        # 轮数没变，不保存
         if current_turn <= self._last_saved_turn:
             return False
 
-        # 如果已有保存任务在队列中，不重复提交
-        if self._save_pending:
-            logger.debug("保存任务已在队列中，跳过")
+        # 🆕 内容没变，不保存（更强的去重）
+        current_hash = self._get_content_hash(working_memory)
+        if current_hash == self._last_saved_content_hash:
+            logger.debug(f"内容未变化，跳过保存")
             return False
 
         return True
 
-    def mark_pending(self, working_memory: "WorkingMemoryManager") -> None:
-        """
-        标记保存任务为 pending
-
-        Args:
-            working_memory: 工作记忆管理器
-        """
+    def mark_saving(self, working_memory: "WorkingMemoryManager") -> None:
+        """标记正在保存"""
         self._save_pending = True
         self._last_saved_turn = len(working_memory) // 2
+        self._last_saved_content_hash = self._get_content_hash(working_memory)
 
-    def on_task_complete(self, operation: str | None = None) -> None:
-        """
-        任务完成回调
-
-        Args:
-            operation: 操作类型
-        """
-        if operation == "save_messages":
-            self._save_pending = False
-            logger.debug("保存任务完成，重置 pending 状态")
+    def mark_saved(self) -> None:
+        """标记保存完成"""
+        self._save_pending = False
 
     async def start_background_manager(self) -> None:
-        """启动后台管理器（幂等）"""
+        """启动后台管理器"""
         if self._background_manager is None:
-            logger.warning("后台管理器未注入，无法启动")
+            logger.warning("后台管理器未注入")
             return
 
         if not self._bg_started and not self._shutting_down:
@@ -139,49 +116,27 @@ class SaveCoordinator:
         working_memory: "WorkingMemoryManager",
         force: bool = False,
     ) -> bool:
-        """
-        异步保存（如果需要）
-
-        Args:
-            working_memory: 工作记忆管理器
-            force: 是否强制保存（忽略去重逻辑）
-
-        Returns:
-            True 表示提交了保存任务
-        """
-        # 检查是否启用自动保存
-        if not self._session_config.auto_save:
+        """异步保存"""
+        if not self._session_config.auto_save and not force:
             return False
 
-        # 检查是否应该保存
         if not self.should_save(working_memory, force=force):
             return False
 
-        # 获取当前会话
         current_session = self._session_manager.get_current_session()
         if current_session is None:
-            self._save_pending = False
             return False
 
-        # 获取当前轮数
-        current_turn = len(working_memory) // 2
+        # 标记正在保存
+        self.mark_saving(working_memory)
 
-        # 🆕 如果已经保存过相同轮数，跳过
-        if not force and current_turn == self._last_saved_turn and self._save_pending:
-            logger.debug(f"轮数 {current_turn} 已提交过保存任务，跳过")
-            return False
-
-        # 标记 pending
-        self.mark_pending(working_memory)
-
-        # 确保后台管理器已启动
+        # 确保后台管理器启动
         await self.start_background_manager()
 
         if self._background_manager is None:
-            self._save_pending = False
+            self.mark_saved()
             return False
 
-        # 获取消息
         messages = working_memory.get_context()
 
         # 提交持久化任务
@@ -191,9 +146,9 @@ class SaveCoordinator:
                 "session_id": current_session.session_id,
                 "messages": messages,
             },
-            priority=TaskPriority.NORMAL if force else TaskPriority.LOW,
+            priority=TaskPriority.LOW,
             timeout=10.0,
         )
 
-        logger.debug(f"已提交{'强制' if force else '异步'}保存任务 (轮数: {len(messages) // 2})")
+        logger.debug(f"已提交保存任务 (轮数: {len(messages) // 2}, 消息数: {len(messages)})")
         return True

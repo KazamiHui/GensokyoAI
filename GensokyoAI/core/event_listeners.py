@@ -64,18 +64,16 @@ class CoreListeners:
         """记录用户消息到工作记忆"""
         user_input = event.data.get("content", "")
         logger.debug(f"收到消息: {user_input[:50]}...")
-
-        if hasattr(self.agent, "working_memory"):
-            self.agent.working_memory.add_message("user", user_input)
+        
+        self.agent.working_memory.add_message("user", user_input)
 
     async def on_message_sent(self, event: Event) -> None:
-        """记录助手消息到工作记忆 - 这是唯一的记录入口"""
+        """记录助手消息到工作记忆 - 统一入口"""
         response = event.data.get("content", "")
-        if hasattr(self.agent, "working_memory") and response:
-            self.agent.working_memory.add_message("assistant", response)
-            logger.debug(f"记录助手消息: {response[:50]}...")
-        logger.debug(f"发送响应: {response[:50]}...")
-
+        
+        self.agent.working_memory.add_message("assistant", response)
+        logger.debug(f"记录并发送响应: {response[:50]}...")
+        
     # ==================== 记忆事件 ====================
 
     async def on_working_memory_added(self, event: Event) -> None:
@@ -409,3 +407,84 @@ class ErrorListeners:
             if err.get("status_code") == "502" and err["timestamp"] > cutoff:
                 return True
         return False
+    
+    
+class PersistenceListeners:
+    """持久化监听器 - 响应需要保存的事件"""
+    
+    def __init__(self, agent: "Agent", event_bus: EventBus):
+        self.agent = agent
+        self.event_bus = event_bus
+        self._session = self.agent.session_manager.get_current_session()
+        self._register()
+    
+    def _register(self) -> None:
+        # 订阅消息发送事件，触发保存
+        self.event_bus.subscribe(
+            SystemEvent.MESSAGE_SENT,
+            self._on_message_sent_for_persistence
+        )
+        
+        # 订阅主动消息事件
+        self.event_bus.subscribe(
+            SystemEvent.THINK_ENGINE_INITIATIVE,
+            self._on_initiative_for_persistence
+        )
+        
+        # 订阅工具调用完成事件（可选）
+        self.event_bus.subscribe(
+            SystemEvent.TOOL_CALL_COMPLETED,
+            self._on_tool_completed_for_persistence
+        )
+        
+        logger.debug("💾 [PersistenceListeners] 持久化监听器已注册")
+    
+    async def _on_message_sent_for_persistence(self, event: Event) -> None:
+        """消息发送后触发保存"""
+        await self._trigger_save(event, "message_sent")
+    
+    async def _on_initiative_for_persistence(self, event: Event) -> None:
+        """主动消息后触发保存"""
+        await self._trigger_save(event, "initiative")
+    
+    async def _on_tool_completed_for_persistence(self, event: Event) -> None:
+        """工具调用完成后触发保存"""
+        await self._trigger_save(event, "tool_completed")
+    
+    async def _trigger_save(self, event: Event, source: str) -> None:
+        """触发保存操作"""
+        if not hasattr(self.agent, "save_coordinator"):
+            return
+        
+        # 发布保存开始事件
+        self.event_bus.publish(Event(
+            type=SystemEvent.PERSISTENCE_SAVE_STARTED,
+            source=f"persistence_listeners.{source}",
+            data={"trigger_event_id": event.id}
+        ))
+        
+        try:
+            # 执行保存
+            success = await self.agent.save_coordinator.save_async(
+                self.agent.working_memory,
+                force=False  # 让 save_coordinator 自己判断
+            )
+            
+            # 发布保存完成事件
+            self.event_bus.publish(Event(
+                type=SystemEvent.PERSISTENCE_SAVE_COMPLETED if success else SystemEvent.PERSISTENCE_SAVE_FAILED,
+                source=f"persistence_listeners.{source}",
+                data={
+                    "trigger_event_id": event.id,
+                    "success": success,
+                    "session_id": self._session.session_id if self._session else None
+                }
+            ))
+            
+        except Exception as e:
+            logger.error(f"保存失败: {e}")
+            self.event_bus.publish(Event(
+                type=SystemEvent.PERSISTENCE_SAVE_FAILED,
+                source=f"persistence_listeners.{source}",
+                data={"error": str(e)}
+            ))
