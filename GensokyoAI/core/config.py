@@ -64,24 +64,6 @@ class ThinkEngineConfig(Struct):
     random_walk_steps_max: int = 5  # 随机游走最多步数
     emotional_trigger_threshold: float = 0.5  # 优先选择高情感话题的阈值
     emotional_priority_probability: float = 0.7  # 优先选择高情感话题的概率
-    initiative_detection_keywords: list[str] = field(
-        default_factory=lambda: [
-            "想说",
-            "想问",
-            "想告诉",
-            "想提醒",
-            "想分享",
-            "想建议",
-            "想邀请",
-            "想安慰",
-            "想鼓励",
-            "想道歉",
-            "下次见面",
-            "等他回来",
-            "主动",
-            "应该告诉",
-        ]
-    )
     think_temperature: float = 0.7  # 思考时的温度
     think_max_tokens: int = 200  # 思考最大 token 数
     initiative_temperature: float = 0.8  # 生成主动消息时的温度
@@ -322,8 +304,6 @@ class ConfigLoader:
             emotional_priority_probability=override.emotional_priority_probability
             if override.emotional_priority_probability != 0.7
             else base.emotional_priority_probability,
-            initiative_detection_keywords=override.initiative_detection_keywords
-            or base.initiative_detection_keywords,
             think_temperature=override.think_temperature
             if override.think_temperature != 0.7
             else base.think_temperature,

@@ -13,6 +13,8 @@ from .message_builder import MessageBuilder
 from .response_handler import ResponseHandler
 from .lifecycle import LifecycleManager
 from .think_engine import ThinkEngine
+from .action_planner import ActionPlanner
+from .action_executor import ActionExecutor
 
 from ..config import AppConfig, ConfigLoader
 from ..events import EventBus, Event, SystemEvent
@@ -43,51 +45,31 @@ request_id_var: ContextVar[str] = ContextVar("request_id", default="")
 class Agent:
     """AI 角色扮演 Agent - 事件驱动版"""
 
-    # ==================== 初始化 ====================
-
     def __init__(
         self,
         config: AppConfig | None = None,
         config_file: Path | None = None,
         character_file: Path | None = None,
     ) -> None:
-        """初始化 Agent，所有组件在 __init__ 中完成创建和注册"""
-
         self._init_config(config, config_file, character_file)
-
         self._init_infrastructure()
-
         self._init_core_components()
-
-        self._init_think_engine()
-
         self._init_memory_system()
-
         self._init_tool_system()
-
         self._init_session_system()
-
         self._init_message_components()
-
         self._init_event_listeners()
-
         self._inject_dependencies()
-
         self._init_lifecycle()
-
+        self._init_think_engine()
+        self._init_action_components()
         self._publish_started_event()
 
         logger.info(f"Agent 初始化完成，角色: {self.config.character.name}")  # type: ignore
 
     # ==================== 初始化子方法 ====================
 
-    def _init_config(
-        self,
-        config: AppConfig | None,
-        config_file: Path | None,
-        character_file: Path | None,
-    ) -> None:
-        """加载配置"""
+    def _init_config(self, config, config_file, character_file) -> None:
         loader = ConfigLoader()
         self.config = config or loader.load(config_file)
 
@@ -102,37 +84,26 @@ class Agent:
         self.system_prompt = self._build_system_prompt()
 
     def _init_infrastructure(self) -> None:
-        """初始化基础设施"""
         self.event_bus = EventBus(enable_trace=True)
         self._request_semaphore = asyncio.Semaphore(1)
         self._working_memory: Optional[WorkingMemoryManager] = None
 
     def _init_core_components(self) -> None:
-        """初始化核心组件"""
-        character_name = safe_get(self.config, "character.name", "default")
-        self.character_name = character_name
+        self.character_name = safe_get(self.config, "character.name", "default")
 
     def _init_memory_system(self) -> None:
-        """初始化记忆系统"""
-        character_name = self.character_name
         self._memory_base_path = self.config.session.save_path
-
         self._ollama_client = ModelClient(self.config.model, event_bus=self.event_bus)
-
         self.episodic_memory = EpisodicMemoryManager(
-            self.config.memory, character_name, None, self._ollama_client
+            self.config.memory, self.character_name, None, self._ollama_client
         )
-
         self._semantic_memory: Optional[SemanticMemoryManager] = None
 
     def _init_tool_system(self) -> None:
-        """初始化工具系统"""
         self.tool_registry = ToolRegistry()
-        # 🆕 创建 ToolExecutor 时传入 event_bus
         self.tool_executor = ToolExecutor(self.tool_registry, event_bus=self.event_bus)
 
     def _init_session_system(self) -> None:
-        """初始化会话管理"""
         self.session_manager = SessionManager(
             self.config.session,
             self.character_name,
@@ -140,87 +111,73 @@ class Agent:
         )
 
     def _init_message_components(self) -> None:
-        """初始化消息处理组件（懒加载占位）"""
         self._message_builder: Optional[MessageBuilder] = None
         self._save_coordinator: Optional[SaveCoordinator] = None
         self._response_handler: Optional[ResponseHandler] = None
         self._background_manager: Optional[BackgroundManager] = None
 
     def _init_event_listeners(self) -> None:
-        """注册所有事件监听器"""
         self.core_listeners = CoreListeners(self, self.event_bus)
         self.memory_service_listeners = MemoryServiceListeners(self, self.event_bus)
         self.metrics_listeners = MetricsListeners(self.event_bus)
         self.error_listeners = ErrorListeners(self.event_bus)
-
         logger.debug("所有事件监听器已注册")
 
     def _inject_dependencies(self) -> None:
-        """注入依赖到各模块"""
-        # 注入事件总线到工具模块
         set_event_bus(self.event_bus)
 
     def _init_lifecycle(self) -> None:
-        """初始化生命周期管理器"""
         self.lifecycle = LifecycleManager(on_shutdown=self._on_shutdown)
         self.lifecycle.setup_signal_handlers()
 
     def _init_think_engine(self) -> None:
-        """初始化思考引擎（延迟到语义记忆初始化后）"""
         self._think_engine: Optional[ThinkEngine] = None
 
+    def _init_action_components(self) -> None:
+        self._action_planner: Optional[ActionPlanner] = None
+        self._action_executor: Optional[ActionExecutor] = None
+
     def _publish_started_event(self) -> None:
-        """发布 Agent 启动事件"""
-        self.event_bus.publish(
-            Event(
-                type=SystemEvent.AGENT_STARTED,
-                source="agent",
-                data={"character": self.config.character.name},  # type: ignore
-            )
-        )
+        self.event_bus.publish(Event(
+            type=SystemEvent.AGENT_STARTED,
+            source="agent",
+            data={"character": self.config.character.name}  # type: ignore
+        ))
 
     def _build_system_prompt(self) -> str:
-        """构建系统提示词"""
         if not self.config.character:
             raise AgentError("No Character be roleplayed.")
         return self.config.character.system_prompt
 
-    # ==================== 属性（懒加载） ====================
+    # ==================== 懒加载属性 ====================
 
     @property
     def semantic_memory(self) -> SemanticMemoryManager:
-        """获取语义记忆（懒加载，依赖当前会话）"""
         if self._semantic_memory is None:
             current_session = self.session_manager.get_current_session()
             if not current_session:
                 raise AgentError("No active session for semantic memory")
 
-            session_id = current_session.session_id
-            memory_path = self._memory_base_path / self.character_name / "memory" / session_id
+            memory_path = self._memory_base_path / self.character_name / "memory" / current_session.session_id
             memory_path.mkdir(parents=True, exist_ok=True)
 
             self._semantic_memory = SemanticMemoryManager(
                 self.config.memory, self.character_name, memory_path, self._ollama_client
             )
             logger.debug(f"语义记忆已初始化: {memory_path}")
-
         return self._semantic_memory
 
     @property
     def working_memory(self) -> WorkingMemoryManager:
-        """获取当前会话的工作记忆"""
         current_session = self.session_manager.get_current_session()
         if not current_session:
             raise AgentError("No active session")
         if not self._working_memory:
-            self._working_memory = self.session_manager.get_working_memory(
-                current_session.session_id
-            )
+            self._working_memory = self.session_manager.get_working_memory(current_session.session_id)
         return self._working_memory
 
     @property
     def message_builder(self) -> MessageBuilder:
-        """获取消息构建器（懒加载）"""
         if self._message_builder is None:
             self._message_builder = MessageBuilder(
                 system_prompt=self.system_prompt,
@@ -234,7 +191,6 @@ class Agent:
 
     @property
     def save_coordinator(self) -> SaveCoordinator:
-        """获取保存协调器（懒加载）"""
         if self._save_coordinator is None:
             self._save_coordinator = SaveCoordinator(
                 session_manager=self.session_manager,
@@ -246,7 +202,6 @@ class Agent:
 
     @property
     def response_handler(self) -> ResponseHandler:
-        """获取响应处理器（懒加载）"""
         if self._response_handler is None:
             self._response_handler = ResponseHandler(
                 config=self.config,
@@ -261,141 +216,98 @@ class Agent:
 
     @property
     def is_shutting_down(self) -> bool:
-        """是否正在关闭"""
         return self.lifecycle.is_shutting_down
 
     # ==================== 核心 API ====================
 
-    async def send(
-        self, user_input: str, system_contexts: list[str] | None = None
-    ) -> Message | None:
-        """发送消息（非流式）"""
+    async def send(self, user_input: str, system_contexts: list[str] | None = None) -> Message | None:
+        """发送消息（非流式）- 完全事件驱动"""
         if self.is_shutting_down:
             return None
 
-        self.event_bus.publish(
-            Event(type=SystemEvent.MESSAGE_RECEIVED, source="agent", data={"content": user_input})
-        )
+        # 准备接收响应
+        response_future = self._action_executor.prepare_response() # type: ignore
 
-        async with self._request_semaphore:
-            try:
-                self.event_bus.publish(
-                    Event(
-                        type=SystemEvent.MESSAGE_PROCESSING,
-                        source="agent",
-                        data={"content": user_input[:50]},
-                    )
-                )
+        # 发布消息接收事件
+        self.event_bus.publish(Event(
+            type=SystemEvent.MESSAGE_RECEIVED,
+            source="agent",
+            data={"content": user_input, "system_contexts": system_contexts}
+        ))
 
-                response = await self._do_send(user_input, system_contexts)
+        try:
+            full_response = await asyncio.wait_for(response_future, timeout=60.0)
+            if full_response:
+                return Message(role="assistant", content=full_response)
+        except asyncio.TimeoutError:
+            logger.warning("等待响应超时")
+            return Message(role="assistant", content="「唔…我有点走神了…」")
 
-                if response and response.content:
-                    self.event_bus.publish(
-                        Event(
-                            type=SystemEvent.MESSAGE_SENT,
-                            source="agent",
-                            data={"content": response.content},
-                        )
-                    )
-
-                return response
-
-            except Exception as e:
-                self.event_bus.publish(
-                    Event(
-                        type=SystemEvent.ERROR_OCCURRED,
-                        source="agent",
-                        data={"error": str(e), "context": "send"},
-                    )
-                )
-                raise
-
-    async def _do_send(self, user_input: str, system_contexts: list[str] | None) -> Message:
-        """实际执行发送逻辑"""
-        await self._ensure_background_manager()
-
-        messages = self.message_builder.build(user_input, system_contexts)
-        tools = self.tool_registry.get_schemas() if self.config.tool.enabled else None
-
-        return await self.response_handler.process_non_stream(messages, tools)
+        return None
 
     async def send_stream(
         self, user_input: str, system_contexts: list[str] | None = None
     ) -> AsyncIterator[StreamChunk]:
-        """发送消息（流式）"""
+        """发送消息（流式）- 完全事件驱动"""
         if self.is_shutting_down:
             return
 
-        self.event_bus.publish(
-            Event(type=SystemEvent.MESSAGE_RECEIVED, source="agent", data={"content": user_input})
-        )
+        # 准备接收响应
+        response_future = self._action_executor.prepare_response() # type: ignore
 
-        async with self._request_semaphore:
-            full_response = ""
-            try:
-                async for chunk in self._do_send_stream(user_input, system_contexts):
-                    if chunk.content:
-                        full_response += chunk.content
-                    yield chunk
+        # 发布消息接收事件
+        self.event_bus.publish(Event(
+            type=SystemEvent.MESSAGE_RECEIVED,
+            source="agent",
+            data={"content": user_input, "system_contexts": system_contexts}
+        ))
 
-            finally:
-                if full_response:
-                    self.event_bus.publish(
-                        Event(
-                            type=SystemEvent.MESSAGE_SENT,
-                            source="agent",
-                            data={"content": full_response},
-                        )
-                    )
-
-    async def _do_send_stream(
-        self, user_input: str, system_contexts: list[str] | None
-    ) -> AsyncIterator[StreamChunk]:
-        """实际执行流式发送逻辑"""
-        await self._ensure_background_manager()
-
-        messages = self.message_builder.build(user_input, system_contexts)
-        tools = self.tool_registry.get_schemas() if self.config.tool.enabled else None
-
-        async for chunk in self.response_handler.process_stream(messages, tools):
-            if self.is_shutting_down:
-                break
-            yield chunk
+        # 流式返回
+        full_response = ""
+        try:
+            while True:
+                try:
+                    chunk = await asyncio.wait_for(self._action_executor.get_chunk(), timeout=0.1) # type: ignore
+                    if chunk:
+                        full_response += chunk
+                        yield StreamChunk(content=chunk)
+                except asyncio.TimeoutError:
+                    if response_future.done():
+                        break
+                    continue
+        finally:
+            self._action_executor.complete_response(full_response) # type: ignore
 
     # ==================== 会话管理 ====================
 
     def create_session(self) -> SessionContext:
-        """创建新会话"""
         session = self.session_manager.create_session()
         self._working_memory = None
         self._semantic_memory = None
-
-        self.event_bus.publish(
-            Event(type=SystemEvent.SESSION_CREATED, source="agent", data={"session": session})
-        )
-
+        self.event_bus.publish(Event(
+            type=SystemEvent.SESSION_CREATED,
+            source="agent",
+            data={"session": session}
+        ))
         return session
 
     def resume_session(self, session_id: str) -> bool:
-        """恢复会话"""
         if self.session_manager.set_current_session(session_id):
             self._working_memory = None
             self._semantic_memory = None
             session = self.session_manager.get_current_session()
-
-            self.event_bus.publish(
-                Event(type=SystemEvent.SESSION_RESUMED, source="agent", data={"session": session})
-            )
-
+            self.event_bus.publish(Event(
+                type=SystemEvent.SESSION_RESUMED,
+                source="agent",
+                data={"session": session}
+            ))
             return True
         return False
 
     async def async_save(self) -> None:
-        """异步保存会话（强制）"""
         await self.save_coordinator.save_async(self.working_memory, force=True)
 
     def rollback(self, num: int = 1, mode: Literal["turns", "messages"] = "turns") -> None:
-        """回滚对话"""
         wm = self.working_memory
         roll_num = num * 2 if mode == "turns" else num
         for _ in range(roll_num):
@@ -405,12 +317,11 @@ class Agent:
     # ==================== 生命周期 ====================
 
     async def start(self) -> None:
-        """启动 Agent"""
         await self.event_bus.start()
         await self._ensure_background_manager()
         await self.episodic_memory.initialize()
 
-        # 🆕 启动思考引擎
+        # 启动思考引擎
         if self._think_engine is None and self.semantic_memory is not None:
             self._think_engine = ThinkEngine(
                 semantic_memory=self.semantic_memory,
@@ -422,10 +333,60 @@ class Agent:
         if self._think_engine:
             await self._think_engine.start()
 
+        # 初始化决策组件
+        if self._action_planner is None:
+            self._action_planner = ActionPlanner(
+                character_name=self.character_name,
+                model_client=self._ollama_client,
+                working_memory=self.working_memory,
+                semantic_memory=self.semantic_memory,
+                event_bus=self.event_bus,
+            )
+        if self._action_executor is None:
+            self._action_executor = ActionExecutor(self, self.event_bus)
+
+        # 订阅 GENERATE_RESPONSE 事件
+        self.event_bus.subscribe(
+            SystemEvent.GENERATE_RESPONSE,
+            self._on_generate_response,
+        )
+
         logger.info("Agent 已启动")
 
+    async def _on_generate_response(self, event: Event) -> None:
+        """处理生成响应事件"""
+        user_input = event.data.get("user_input", "")
+        system_contexts = event.data.get("system_contexts", [])
+
+        await self._ensure_background_manager()
+        messages = self.message_builder.build(user_input, system_contexts)
+        tools = self.tool_registry.get_schemas() if self.config.tool.enabled else None
+
+        full_response = ""
+        async for chunk in self.response_handler.process_stream(messages, tools):
+            if self.is_shutting_down:
+                break
+            if chunk.content:
+                full_response += chunk.content
+                await self._action_executor.feed_chunk(chunk.content) # type: ignore
+
+        self._action_executor.complete_response(full_response) # type: ignore
+
+        # 🆕 先记录到工作记忆
+        if full_response:
+            self.working_memory.add_message("assistant", full_response)
+            
+            # 发布 MESSAGE_SENT 事件（让其他监听器知道）
+            self.event_bus.publish(Event(
+                type=SystemEvent.MESSAGE_SENT,
+                source="agent",
+                data={"content": full_response}
+            ))
+            
+            # 然后再保存
+            await self.save_coordinator.save_async(self.working_memory)
+
     async def _on_shutdown(self) -> None:
-        """关闭回调"""
         self.event_bus.publish(Event(type=SystemEvent.AGENT_SHUTDOWN, source="agent"))
 
         if self._think_engine:
@@ -440,31 +401,24 @@ class Agent:
         logger.info("Agent 已关闭")
 
     async def shutdown(self) -> None:
-        """主动关闭"""
         await self.lifecycle.shutdown()
 
     # ==================== 私有辅助方法 ====================
 
     async def _ensure_background_manager(self) -> None:
-        """确保后台管理器已启动"""
         if self._background_manager is None:
             self._background_manager = self._create_background_manager()
             await self._background_manager.start()
-
             if self._save_coordinator:
                 self._save_coordinator.set_background_manager(self._background_manager)
 
     def _create_background_manager(self) -> BackgroundManager:
-        """创建后台管理器"""
         manager = BackgroundManager(max_workers=2, max_queue_size=50)
         manager.register_persistence_worker(PersistenceWorker(self.session_manager._persistence))
         return manager
 
-    # ==================== 查询接口 ====================
-
     @property
     def metrics(self) -> dict:
-        """获取运行指标"""
         return {
             "event_bus": self.event_bus.stats,
             "app": self.metrics_listeners.metrics if hasattr(self, "metrics_listeners") else {},

@@ -28,7 +28,7 @@ class CoreListeners:
 
         # 对话事件
         bus.subscribe(SystemEvent.MESSAGE_RECEIVED, self.on_message_received)
-        bus.subscribe(SystemEvent.MESSAGE_SENT, self.on_message_sent)  # 🔧 合并为异步
+        bus.subscribe(SystemEvent.MESSAGE_SENT, self.on_message_sent)
 
         # 记忆事件
         bus.subscribe(SystemEvent.MEMORY_WORKING_ADDED, self.on_working_memory_added)
@@ -61,6 +61,7 @@ class CoreListeners:
     # ==================== 对话事件 ====================
 
     async def on_message_received(self, event: Event) -> None:
+        """记录用户消息到工作记忆"""
         user_input = event.data.get("content", "")
         logger.debug(f"收到消息: {user_input[:50]}...")
 
@@ -68,7 +69,7 @@ class CoreListeners:
             self.agent.working_memory.add_message("user", user_input)
 
     async def on_message_sent(self, event: Event) -> None:
-        """异步记录助手消息和日志"""
+        """记录助手消息到工作记忆 - 这是唯一的记录入口"""
         response = event.data.get("content", "")
         if hasattr(self.agent, "working_memory") and response:
             self.agent.working_memory.add_message("assistant", response)
@@ -250,16 +251,14 @@ class MemoryServiceListeners:
                     topic_id = store._topic_name_index[topic_name_lower]
                     topic = store._topics[topic_id]
 
-                    # 创建新记忆，标记取代旧记忆
                     memory = TopicMemory(
                         content=new_content,
-                        importance=0.7,  # 更新记忆默认较高重要性
+                        importance=0.7,
                         memory_type=TopicMemoryType.CORRECTION,
                         supersedes=topic.message_ids[-1] if topic.message_ids else None,
                     )
                     store._memories[memory.id] = memory
 
-                    # 更新话题
                     store._update_topic(topic, memory, 0.7, 10.0)
                     await store._save_async()
 
@@ -288,7 +287,6 @@ class MetricsListeners:
         self._register()
 
     def _register(self) -> None:
-        # 🔧 全部改为异步订阅
         self.event_bus.subscribe(SystemEvent.MESSAGE_RECEIVED, self._async_inc_received)
         self.event_bus.subscribe(SystemEvent.MESSAGE_SENT, self._async_inc_sent)
         self.event_bus.subscribe(SystemEvent.TOOL_CALL_COMPLETED, self._async_inc_tool)
@@ -325,13 +323,11 @@ class ErrorListeners:
         self._register()
 
     def _register(self) -> None:
-        # 🔧 全部改为异步订阅
         self.event_bus.subscribe(SystemEvent.MODEL_ERROR, self._async_update_model_error)
         self.event_bus.subscribe(SystemEvent.TOOL_ERROR, self._async_update_tool_error)
         self.event_bus.subscribe(SystemEvent.ERROR_OCCURRED, self._async_update_general_error)
 
     async def _async_update_model_error(self, event: Event) -> None:
-        """异步更新模型错误统计并记录日志"""
         data = event.data
         context = data.get("context", "unknown")
         key = f"model:{context}"
@@ -349,7 +345,6 @@ class ErrorListeners:
         if len(self._last_errors) > 10:
             self._last_errors.pop(0)
 
-        # 日志记录也合并进来
         status_code = data.get("status_code")
         model = data.get("model", "unknown")
         error_msg = data.get("error", "未知错误")
@@ -363,7 +358,6 @@ class ErrorListeners:
             logger.error(f"🤖 [ErrorListener] 模型错误: {model} - {error_msg}")
 
     async def _async_update_tool_error(self, event: Event) -> None:
-        """异步更新工具错误统计并记录日志"""
         data = event.data
         tool_name = data.get("tool_name", "unknown")
         key = f"tool:{tool_name}"
@@ -382,7 +376,6 @@ class ErrorListeners:
         logger.error(f"🔧 [ErrorListener] 工具错误: {tool_name} - {data.get('error', '未知错误')}")
 
     async def _async_update_general_error(self, event: Event) -> None:
-        """异步更新通用错误统计并记录日志"""
         key = "general"
         self._error_counts[key] = self._error_counts.get(key, 0) + 1
 
@@ -403,7 +396,6 @@ class ErrorListeners:
             f"   原始事件: {original_event.get('type', 'unknown')}"
         )
 
-    # 查询接口保持不变
     def get_error_stats(self) -> dict:
         return {
             "counts": self._error_counts.copy(),

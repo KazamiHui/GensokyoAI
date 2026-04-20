@@ -38,9 +38,13 @@ class SystemEvent(Enum):
     # 对话事件
     MESSAGE_RECEIVED = "message.received"
     MESSAGE_PROCESSING = "message.processing"
-    MESSAGE_RESPONSE_READY = "message.response.ready"
     MESSAGE_SENT = "message.sent"
     MESSAGE_STREAM_CHUNK = "message.stream.chunk"
+
+    # 🆕 响应生成事件（替代直接调用）
+    GENERATE_RESPONSE = "generate.response"      # 请求生成响应
+    RESPONSE_STREAMING = "response.streaming"    # 流式响应中
+    RESPONSE_COMPLETED = "response.completed"    # 响应完成
 
     # 记忆事件
     MEMORY_WORKING_ADDED = "memory.working.added"
@@ -70,10 +74,14 @@ class SystemEvent(Enum):
     BACKGROUND_TASK_SUBMITTED = "background.task.submitted"
     BACKGROUND_TASK_COMPLETED = "background.task.completed"
     BACKGROUND_TASK_FAILED = "background.task.failed"
-    
-    # 思考事件
+
+    # 思考引擎事件
+    THINK_ENGINE_THOUGHT = "think.engine.thought"        # 静默思考完成
     THINK_ENGINE_INITIATIVE = "think.engine.initiative"  # 产生主动消息
-    THINK_ENGINE_THOUGHT = "think.engine.thought"        # 静默思考完成（可选）
+
+    # 🆕 行动决策事件
+    ACTION_DECIDED = "action.decided"       # ActionPlanner 决策完成
+    ACTION_EXECUTED = "action.executed"     # ActionExecutor 执行完成
 
 
 class Event(Struct):
@@ -162,13 +170,11 @@ class EventBus:
 
         self._running = False
 
-        # 取消所有等待中的请求
         for request_id, future in list(self._pending_requests.items()):
             if not future.done():
                 future.set_exception(asyncio.CancelledError("EventBus stopped"))
         self._pending_requests.clear()
 
-        # 等待工作器处理完当前事件
         if self._worker_task and not self._worker_task.done():
             try:
                 await asyncio.wait_for(asyncio.shield(self._worker_task), timeout=2.0)
@@ -255,34 +261,20 @@ class EventBus:
 
         return sub.id
 
-    def subscribe_all(
-        self,
-        event_types: list[SystemEvent],
-        handler: Callable[[Event], Any],
-        priority: EventPriority = EventPriority.NORMAL,
-    ) -> list[str]:
-        return [self.subscribe(et, handler, priority) for et in event_types]
-
     def unsubscribe(self, subscription_id: str) -> bool:
         for event_type, subs in self._subscribers.items():
             for sub in subs:
                 if sub.id == subscription_id:
                     subs.remove(sub)
                     if self.enable_trace:
-                        logger.debug(
-                            f"🔕 [EventBus] 取消订阅: {subscription_id} ({sub.handler_name})"
-                        )
+                        logger.debug(f"🔕 [EventBus] 取消订阅: {subscription_id} ({sub.handler_name})")
                     return True
         return False
 
     # ==================== 事件发布 ====================
 
     def publish(self, event: Event, immediate: bool = False) -> None:
-        """
-        发布事件
-
-        🆕 新增：先立即调用同步监听器（不等队列）
-        """
+        """发布事件"""
         if self.enable_trace:
             data_preview = self._format_data_preview(event.data)
             logger.info(
@@ -299,75 +291,33 @@ class EventBus:
             except asyncio.QueueFull:
                 logger.warning(f"⚠️ [EventBus] 事件队列已满，丢弃事件: {event.type.value}")
 
-    # 异步请求-响应（非阻塞）
-    async def request(
-        self,
-        event: Event,
-        timeout: Optional[float] = None,
-    ) -> Any:
-        """
-        发送请求事件并等待响应（异步非阻塞）
-
-        Args:
-            event: 请求事件
-            timeout: 超时时间（秒），默认 30 秒
-
-        Returns:
-            第一个有效响应结果
-        """
+    async def request(self, event: Event, timeout: Optional[float] = None) -> Any:
+        """发送请求事件并等待响应"""
         request_id = event.id
-
-        # 创建 Future 等待响应
         future: asyncio.Future = asyncio.Future()
         self._pending_requests[request_id] = future
 
         try:
-            # 发布请求事件
             self.publish(event)
-
-            # 等待响应（非阻塞，只挂起当前协程）
             timeout_val = timeout or self._response_timeout
             result = await asyncio.wait_for(future, timeout=timeout_val)
             return result
-
         except asyncio.TimeoutError:
             if self.enable_trace:
-                logger.warning(f"⏰ [EventBus] 请求超时: {event.type.value} (ID: {request_id})")
-            return None
-        except asyncio.CancelledError:
-            if self.enable_trace:
-                logger.debug(f"🚫 [EventBus] 请求被取消: {event.type.value} (ID: {request_id})")
+                logger.warning(f"⏰ [EventBus] 请求超时: {event.type.value}")
             return None
         finally:
             self._pending_requests.pop(request_id, None)
 
     def respond(self, request_event: Event, result: Any) -> None:
-        """
-        响应请求事件
-
-        Args:
-            request_event: 原始请求事件
-            result: 响应结果
-        """
+        """响应请求事件"""
         request_id = request_event.id
         future = self._pending_requests.get(request_id)
 
         if future and not future.done():
             future.set_result(result)
             if self.enable_trace:
-                logger.debug(
-                    f"✅ [EventBus] 请求响应: {request_event.type.value} (ID: {request_id})"
-                )
-        else:
-            # 如果没有等待者，发布普通响应事件
-            response_event = Event(
-                type=SystemEvent.MEMORY_SEMANTIC_ADDED_RESPONSE
-                if request_event.type == SystemEvent.MEMORY_SEMANTIC_ADDED
-                else SystemEvent.MEMORY_SEMANTIC_RECALLED_RESPONSE,
-                source="eventbus",
-                data={"request_id": request_id, "result": result},
-            )
-            self.publish(response_event)
+                logger.debug(f"✅ [EventBus] 请求响应: {request_event.type.value}")
 
     async def _process_event(self, event: Event) -> list[Any]:
         if event.type not in self._subscribers:
@@ -378,9 +328,7 @@ class EventBus:
         subscribers = self._subscribers[event.type]
 
         if self.enable_trace:
-            logger.debug(
-                f"🔄 [EventBus] 处理事件 '{event.type.value}' -> {len(subscribers)} 个订阅者"
-            )
+            logger.debug(f"🔄 [EventBus] 处理事件 '{event.type.value}' -> {len(subscribers)} 个订阅者")
 
         results = []
         to_remove = []
@@ -390,8 +338,6 @@ class EventBus:
                 try:
                     if not sub.filter_func(event):
                         self._stats["filtered"] += 1
-                        if self.enable_trace:
-                            logger.debug(f"   ⏭️  [EventBus] 跳过 {sub.handler_name} (被过滤器过滤)")
                         continue
                 except Exception as e:
                     logger.warning(f"⚠️ [EventBus] 过滤器异常 {sub.handler_name}: {e}")
@@ -401,13 +347,11 @@ class EventBus:
                 if self.enable_trace:
                     logger.info(f"   📨 [EventBus] 推送给处理器: {sub.handler_name} 执行")
 
-                handler = sub.handler
                 start_time = datetime.now()
-
-                if inspect.iscoroutinefunction(handler):
-                    result = await handler(event)
+                if inspect.iscoroutinefunction(sub.handler):
+                    result = await sub.handler(event)
                 else:
-                    result = await asyncio.to_thread(handler, event)
+                    result = await asyncio.to_thread(sub.handler, event)
 
                 elapsed = (datetime.now() - start_time).total_seconds() * 1000
 
@@ -422,36 +366,23 @@ class EventBus:
 
             except Exception as e:
                 self._stats["errors"] += 1
-
                 if self.enable_trace:
                     logger.error(f"   ❌ [EventBus] {sub.handler_name} 执行失败: {e}")
 
-                error_event = Event(
+                self.publish(Event(
                     type=SystemEvent.ERROR_OCCURRED,
                     source="eventbus",
-                    data={
-                        "original_event": {
-                            "id": event.id,
-                            "type": event.type.value,
-                            "source": event.source,
-                        },
-                        "handler": sub.handler_name,
-                        "error": str(e),
-                    },
-                )
-                self.publish(error_event)
+                    data={"handler": sub.handler_name, "error": str(e)}
+                ))
 
         for sub in to_remove:
             self._subscribers[event.type].remove(sub)
-            if self.enable_trace:
-                logger.debug(f"   🗑️  [EventBus] 移除一次性订阅: {sub.handler_name}")
 
         return results
 
     def _format_data_preview(self, data: Any) -> str:
         if data is None:
             return ""
-
         if isinstance(data, dict):
             if "content" in data:
                 content = str(data["content"])
@@ -459,35 +390,10 @@ class EventBus:
                 return f"[content: {preview}]"
             elif "name" in data:
                 return f"[name: {data['name']}]"
-            elif "session_id" in data:
-                return f"[session: {str(data['session_id'])[:8]}...]"
-            else:
-                keys = list(data.keys())[:3]
-                return f"[{', '.join(keys)}]"
-
         if isinstance(data, str):
             preview = data[:50] + "..." if len(data) > 50 else data
             return f'"{preview}"'
-
         return f"({type(data).__name__})"
-
-    # ==================== 装饰器 ====================
-
-    def on(self, event_type: SystemEvent, priority: EventPriority = EventPriority.NORMAL):
-        def decorator(handler: Callable):
-            self.subscribe(event_type, handler, priority)
-            return handler
-
-        return decorator
-
-    def once(self, event_type: SystemEvent):
-        def decorator(handler: Callable):
-            self.subscribe(event_type, handler, once=True)
-            return handler
-
-        return decorator
-
-    # ==================== 查询 ====================
 
     @property
     def stats(self) -> dict:
@@ -495,21 +401,4 @@ class EventBus:
             **self._stats,
             "queue_size": self._event_queue.qsize(),
             "subscriber_count": sum(len(subs) for subs in self._subscribers.values()),
-            "event_types": [et.value for et in self._subscribers.keys()],
-            "pending_requests": len(self._pending_requests),
-        }
-
-    def list_subscribers(self, event_type: Optional[SystemEvent] = None) -> dict:
-        if event_type:
-            return {
-                event_type.value: [
-                    {"id": s.id, "handler": s.handler_name, "priority": s.priority.name}
-                    for s in self._subscribers.get(event_type, [])
-                ]
-            }
-        return {
-            et.value: [
-                {"id": s.id, "handler": s.handler_name, "priority": s.priority.name} for s in subs
-            ]
-            for et, subs in self._subscribers.items()
         }

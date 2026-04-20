@@ -21,6 +21,14 @@ from ..config import ThinkEngineConfig
 class ThinkEngine:
     """
     静默思考引擎 - 让 AI 拥有自己的心理时间
+    
+    职责：
+    - 定时触发思考
+    - 随机游走话题图谱，产生联想
+    - 调用 LLM 进行静默思考
+    - 发布思考结果事件（THINK_ENGINE_THOUGHT）
+    - ❌ 不负责决策（交给 ActionPlanner）
+    - ❌ 不负责生成主动消息（交给 ActionPlanner）
     """
 
     def __init__(
@@ -29,7 +37,7 @@ class ThinkEngine:
         model_client: ModelClient,
         event_bus: EventBus,
         character_name: str,
-        config: "ThinkEngineConfig",  # 🆕 接收配置
+        config: "ThinkEngineConfig",
     ):
         self.semantic_memory = semantic_memory
         self.model_client = model_client
@@ -50,7 +58,7 @@ class ThinkEngine:
         self._running = True
         self._think_task = asyncio.create_task(self._think_loop())
         logger.info(
-            f"🧠 [{self.character_name}] 思考引擎已启动 (间隔: {self.config.think_interval_minutes}分钟)"
+            f"🧠 [ThinkEngine] 思考引擎已启动 (角色: {self.character_name}, 间隔: {self.config.think_interval_minutes}分钟)"
         )
 
     async def stop(self) -> None:
@@ -62,7 +70,7 @@ class ThinkEngine:
                 await self._think_task
             except asyncio.CancelledError:
                 pass
-        logger.info(f"🧠 [{self.character_name}] 思考引擎已停止")
+        logger.info(f"🧠 [ThinkEngine] 思考引擎已停止 (角色: {self.character_name})")
 
     async def _think_loop(self) -> None:
         """思考主循环"""
@@ -86,7 +94,7 @@ class ThinkEngine:
         topics = store.get_all_topics()
 
         if not topics:
-            logger.debug(f"🧠 [{self.character_name}] 没有话题可思考")
+            logger.debug(f"🧠 [ThinkEngine] {self.character_name} 没有话题可思考")
             return
 
         # 优先选择高情感值的话题
@@ -95,6 +103,7 @@ class ThinkEngine:
 
         if emotional_topics and random.random() < self.config.emotional_priority_probability:
             start_topic = random.choice(emotional_topics)
+            logger.debug(f"🧠 [ThinkEngine] {self.character_name} 优先选择高情感话题: {start_topic.name}")
         else:
             start_topic = random.choice(topics)
 
@@ -106,9 +115,9 @@ class ThinkEngine:
         for _ in range(steps):
             neighbors = list(current.related_topics.keys())
             if neighbors:
-                # 按权重随机选择
                 weights = [current.related_topics[n] for n in neighbors]
-                current = store.get_topic_by_id(random.choices(neighbors, weights=weights)[0])
+                next_id = random.choices(neighbors, weights=weights)[0]
+                current = store.get_topic_by_id(next_id)
                 if current:
                     walk.append(current)
                 else:
@@ -135,12 +144,12 @@ class ThinkEngine:
 只思考，不行动。记住你是{self.character_name}。
 """
 
-        logger.debug(f"🧠 [{self.character_name}] 正在静默思考，游走话题: {[t.name for t in walk]}")
+        logger.debug(f"🧠 [ThinkEngine] {self.character_name} 正在静默思考，游走话题: {[t.name for t in walk]}")
 
         try:
             response = await self.model_client.client.chat(
                 model=self.model_client.model_name,
-                messages=[{"role": "user", "content": prompt}],
+                messages=[{"role": "system", "content": prompt}],
                 stream=False,
                 options={
                     "temperature": self.config.think_temperature,
@@ -150,77 +159,35 @@ class ThinkEngine:
 
             thought = response.message.content
             if thought:
-                logger.info(f"💭 [{self.character_name}] 内心独白: {thought[:100]}...")
-                
-                # 🆕 发布思考完成事件（可选，用于调试/监控）
+                logger.info(f"💭 [ThinkEngine] {self.character_name} 内心独白: {thought[:100]}...")
+
+                # 🆕 只发布思考事件，不判断意图，不生成消息
+                # 决策交给 ActionPlanner
                 self.event_bus.publish(Event(
                     type=SystemEvent.THINK_ENGINE_THOUGHT,
                     source="think_engine",
                     data={
                         "character": self.character_name,
                         "thought": thought,
-                        "topics": [t.name for t in walk]
+                        "topics": [t.name for t in walk],
+                        "topics_detail": [
+                            {
+                                "name": t.name,
+                                "summary": t.summary,
+                                "emotional_valence": t.emotional_valence,
+                            }
+                            for t in walk[:3]
+                        ]
                     }
                 ))
-                
-                # 检查主动意图
-                if self._has_initiative_intent(thought):
-                    initiative = await self._generate_initiative(thought, walk)
-                    if initiative:
-                        # 🆕 发布主动消息事件，而不是存入队列！
-                        self.event_bus.publish(Event(
-                            type=SystemEvent.THINK_ENGINE_INITIATIVE,
-                            source="think_engine",
-                            data={
-                                "character": self.character_name,
-                                "message": initiative,
-                                "thought": thought,  # 附带部分思考，便于上下文
-                                "trigger_topics": [t.name for t in walk[:3]]
-                            }
-                        ))
-                        logger.info(f"✨ [{self.character_name}] 发布主动消息事件: {initiative[:50]}...")
+            else:
+                logger.debug(f"🤫 [ThinkEngine] {self.character_name} 思考了但内容为空")
 
         except Exception as e:
             logger.error(f"静默思考失败: {e}")
-
-    def _has_initiative_intent(self, thought: str) -> bool:
-        """判断是否产生主动意图"""
-        thought_lower = thought.lower()
-        return any(kw in thought_lower for kw in self.config.initiative_detection_keywords)
-
-    async def _generate_initiative(self, thought: str, walk: list) -> Optional[str]:
-        """根据思考生成主动消息"""
-        topics_desc = "\n".join(f"- {t.name}: {t.summary}" for t in walk[:3])
-
-        prompt = f"""基于你的静默思考，你决定主动对用户说些什么。
-
-相关话题：
-{topics_desc}
-
-你的思考：
-{thought}
-
-请生成一句你想主动对用户说的话（保持角色风格，自然、不生硬）。
-只输出这句话，不要任何额外内容。"""
-
-        try:
-            response = await self.model_client.client.chat(
-                model=self.model_client.model_name,
-                messages=[{"role": "user", "content": prompt}],
-                stream=False,
-                options={
-                    "temperature": self.config.initiative_temperature,
-                    "num_predict": self.config.initiative_max_tokens,
-                },
-            )
-
-            return response.message.content.strip() if response.message.content else None
-
-        except Exception as e:
-            logger.error(f"生成主动消息失败: {e}")
-            return None
 
     def trigger_think_now(self) -> None:
         """立即触发一次思考"""
         if self._running:
             asyncio.create_task(self._wander_and_think())
+            logger.debug(f"🧠 [ThinkEngine] {self.character_name} 手动触发思考")
