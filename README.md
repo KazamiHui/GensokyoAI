@@ -1,4 +1,3 @@
-
 # 🌸 GensokyoAI - 幻想乡 AI 角色扮演引擎
 
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
@@ -23,19 +22,40 @@
 |---------|------|---------|
 | **工作记忆** | 当前会话的完整对话 | 滑动窗口，保留最近 N 轮 |
 | **情景记忆** | 历史对话的压缩摘要 | 模型自动摘要，关键事件提取 |
-| **语义记忆** | 长期知识存储和检索 | 🆕 独创的话题感知存储，无需向量数据库 |
+| **语义记忆** | 长期知识存储和检索 | 🆕 话题感知存储 + 遗忘曲线，无需向量数据库 |
+
+### 🧠 静默思考引擎 (ThinkEngine)
+让 AI 拥有自己的"心理时间"：
+- **定时触发思考** - AI 在空闲时主动回顾过往话题
+- **随机游走话题图谱** - 模拟人类的联想思维
+- **情感驱动优先** - 优先思考高情感值的话题
+- **自主决策是否说话** - 通过 ActionPlanner 判断是否主动发起对话
+
+> 💡 **设计哲学**：真正的角色不应该只是"回答问题"，而应该有自己的内心世界。ThinkEngine 让 AI 能够在静默时进行思考，并在恰当的时机主动开口。
+
+### 🎯 行动规划系统 (Action Planner)
+让 AI 自己决定"做什么"：
+| 行动类型 | 说明 |
+|---------|------|
+| **SPEAK** | 回应用户消息 |
+| **INITIATIVE_SPEAK** | 主动发起对话 |
+| **THINK** | 静默思考（内部） |
+| **REMEMBER** | 主动记住某事 |
+| **RECALL** | 主动回忆 |
+| **WAIT** | 什么都不做 |
 
 ### 🛠️ 自主记忆工具
 角色可以主动管理自己的记忆：
 - **`remember` 工具** - AI 自主判断何时记住重要信息
 - **`recall` 工具** - AI 需要时主动检索相关记忆
 - **话题感知存储** - 自动将记忆归类到话题，建立关联图谱
+- **遗忘曲线** - 基于重要性、情感效价和访问频率的智能遗忘机制
 
 > 💡 **设计哲学**：记忆管理完全交给 AI 自主决策，不做任何自动规则。因为最懂角色需要记住什么的，正是扮演它的 LLM 本身。
 
 ### 💬 强大的会话管理
 - ✅ 创建、保存、恢复、列出会话
-- ✅ 自动持久化，支持异步 I/O
+- ✅ 自动持久化，基于 [ayafileio](https://github.com/Patchouli-CN/ayafileio) 的真异步 I/O
 - ✅ 会话回滚（说错话可以撤回）
 - ✅ 会话切换（和不同角色聊天无缝切换）
 
@@ -61,7 +81,7 @@
 - **事件总线**解耦所有组件，易于扩展
 - 后台任务队列处理持久化
 - 流式输出支持，打字机效果
-- 优雅的信号处理和关闭流程
+- **优雅的信号处理和关闭流程**（Ctrl+C 安全退出，数据不丢失）
 
 ### 🔌 可扩展后端
 - 抽象后端基类 `BaseBackend`
@@ -186,7 +206,10 @@ GensokyoAI/
 │   │   │   ├── message_builder.py # 消息构建器
 │   │   │   ├── response_handler.py # 响应处理器（工具调用）
 │   │   │   ├── save_coordinator.py # 保存协调器（去重）
-│   │   │   └── think_engine.py # 思考引擎，让AI可以自己产生想法！
+│   │   │   ├── think_engine.py # 🆕 静默思考引擎
+│   │   │   ├── action_planner.py # 🆕 行动规划器（决策大脑）
+│   │   │   ├── action_executor.py # 🆕 行动执行器
+│   │   │   └── actions.py     # 🆕 行动定义
 │   │   ├── config.py          # 配置管理（YAML + 环境变量）
 │   │   ├── events.py          # 事件总线（发布/订阅）
 │   │   ├── event_listeners.py # 核心事件监听器
@@ -201,7 +224,7 @@ GensokyoAI/
 │   │
 │   ├── session/               # 会话管理
 │   │   ├── manager.py         # 会话管理器
-│   │   ├── persistence.py     # 异步持久化
+│   │   ├── persistence.py     # 异步持久化（基于 ayafileio）
 │   │   └── context.py         # 会话上下文
 │   │
 │   ├── commands/              # 命令系统（与后端解耦）
@@ -253,6 +276,32 @@ GensokyoAI/
 ├── pyproject.toml             # 项目配置（UV）
 ├── requirements.txt           # 依赖列表
 └── README.md                  # 本文档
+```
+
+## 🔧 配置说明
+
+### 思考引擎配置
+```yaml
+think_engine:
+  enabled: true                     # 是否启用静默思考
+  think_interval_minutes: 5         # 思考间隔（分钟）
+  random_walk_steps_min: 2          # 随机游走最少步数
+  random_walk_steps_max: 5          # 随机游走最多步数
+  emotional_trigger_threshold: 0.5  # 优先选择高情感话题的阈值
+  emotional_priority_probability: 0.7 # 优先选择高情感话题的概率
+  think_temperature: 0.7            # 思考时的温度
+  think_max_tokens: 200             # 思考最大 token 数
+```
+
+### 记忆系统配置
+```yaml
+memory:
+  working_max_turns: 20             # 工作记忆最大轮数
+  episodic_threshold: 50            # 触发情景记忆压缩的消息数
+  episodic_keep_recent: 10          # 压缩时保留最近消息数
+  semantic_enabled: true            # 是否启用语义记忆
+  semantic_top_k: 5                 # 检索时返回的话题数
+  semantic_similarity_threshold: 0.7 # 相关性阈值
 ```
 
 ## 🔧 高级用法
@@ -343,8 +392,8 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 
 - [Ollama](https://ollama.ai/) - 本地模型运行
 - [Rich](https://github.com/Textualize/rich) - 终端美化
-- [Loguru](https://github.com/Delgan/loguru) - 优雅的日志
 - [msgspec](https://github.com/jcrist/msgspec) - 高性能序列化
+- [ayafileio](https://github.com/Patchouli-CN/ayafileio) - 高性能异步文件 I/O
 - [上海爱丽丝幻乐团](http://www16.big.or.jp/~zun/) - 创造了幻想乡
 
 ## 🌟 Star History
