@@ -1,5 +1,6 @@
 """事件监听器 - 响应系统事件"""
 
+import asyncio
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
@@ -25,7 +26,7 @@ class CoreListeners:
         # 会话事件
         bus.subscribe(SystemEvent.SESSION_CREATED, self.on_session_created)
         bus.subscribe(SystemEvent.SESSION_RESUMED, self.on_session_resumed)
-        
+
         # 思考事件
         bus.subscribe(SystemEvent.THINK_ENGINE_THOUGHT, self.on_thought_record)
 
@@ -61,7 +62,7 @@ class CoreListeners:
         session = event.data.get("session")
         if session:
             logger.info(f"会话已恢复: {session.session_id[:8]}...")
-            
+
     # ==================== 思考事件 ====================
     async def on_thought_record(self, event: Event) -> None:
         """当角色静默思考时，把思考内容存入语义/情景记忆"""
@@ -74,7 +75,7 @@ class CoreListeners:
         await self.agent.semantic_memory.add_async(
             content=f"【内心思考】{thought}",
             importance=0.6,  # 思考的重要性中等偏高
-            emotional_valence=event.data.get("emotional_valence", 0.0)
+            emotional_valence=event.data.get("emotional_valence", 0.0),
         )
 
         # 2. (可选) 也可以记录到情景记忆，作为一段“心理事件”
@@ -88,23 +89,23 @@ class CoreListeners:
         """记录用户消息到工作记忆"""
         user_input = event.data.get("content", "")
         logger.debug(f"收到消息: {user_input[:50]}...")
-        
+
         self.agent.working_memory.add_message("user", user_input)
 
     async def on_message_sent(self, event: Event) -> None:
         """记录助手消息到工作记忆 - 统一入口"""
         response = event.data.get("content", "")
-        
+
         self.agent.working_memory.add_message("assistant", response)
         logger.debug(f"记录并发送响应: {response[:50]}...")
-        
+
     async def on_initiative_speak_record(self, event: Event) -> None:
         """当角色主动说话时，也把这句话记录到工作记忆"""
         message = event.data.get("message", "")
         if message:
             self.agent.working_memory.add_message("assistant", message)
             logger.debug(f"📝 已记录主动消息到工作记忆: {message[:30]}...")
-        
+
     # ==================== 记忆事件 ====================
 
     async def on_working_memory_added(self, event: Event) -> None:
@@ -179,13 +180,26 @@ class MemoryServiceListeners:
 
         data = event.data
         content = data.get("content", "")
-        importance = data.get("importance", 0.5)
-        topic_name = data.get("topic_name")
-        emotional_valence = data.get("emotional_valence", 0.0)
 
         if not content:
             self.event_bus.respond(event, None)
             return
+
+        # 🆕 立即响应，不等待存储完成
+        self.event_bus.respond(
+            event, {"status": "processing", "topic_name": data.get("topic_name", "记忆")}
+        )
+
+        # 后台执行存储
+        asyncio.create_task(self._do_memory_add(event))
+
+    async def _do_memory_add(self, event: Event) -> None:
+        """后台执行记忆存储"""
+        data = event.data
+        content = data.get("content", "")
+        importance = data.get("importance", 0.5)
+        topic_name = data.get("topic_name")
+        emotional_valence = data.get("emotional_valence", 0.0)
 
         try:
             if hasattr(self.agent, "semantic_memory"):
@@ -199,12 +213,8 @@ class MemoryServiceListeners:
                     logger.debug(
                         f"记忆服务: 已存储 -> 话题「{topic.name}」(情感: {topic.emotional_valence:.2f})"
                     )
-                    self.event_bus.respond(event, {"topic_name": topic.name, "topic_id": topic.id})
-                    return
         except Exception as e:
             logger.error(f"记忆服务: 存储失败 - {e}")
-
-        self.event_bus.respond(event, None)
 
     async def on_memory_recall_request(self, event: Event) -> None:
         """处理记忆检索请求"""
@@ -438,84 +448,87 @@ class ErrorListeners:
             if err.get("status_code") == "502" and err["timestamp"] > cutoff:
                 return True
         return False
-    
-    
+
+
 class PersistenceListeners:
     """持久化监听器 - 响应需要保存的事件"""
-    
+
     def __init__(self, agent: "Agent", event_bus: EventBus):
         self.agent = agent
         self.event_bus = event_bus
         self._session = self.agent.session_manager.get_current_session()
         self._register()
-    
+
     def _register(self) -> None:
         # 订阅消息发送事件，触发保存
-        self.event_bus.subscribe(
-            SystemEvent.MESSAGE_SENT,
-            self._on_message_sent_for_persistence
-        )
-        
+        self.event_bus.subscribe(SystemEvent.MESSAGE_SENT, self._on_message_sent_for_persistence)
+
         # 订阅主动消息事件
         self.event_bus.subscribe(
-            SystemEvent.THINK_ENGINE_INITIATIVE,
-            self._on_initiative_for_persistence
+            SystemEvent.THINK_ENGINE_INITIATIVE, self._on_initiative_for_persistence
         )
-        
+
         # 订阅工具调用完成事件（可选）
         self.event_bus.subscribe(
-            SystemEvent.TOOL_CALL_COMPLETED,
-            self._on_tool_completed_for_persistence
+            SystemEvent.TOOL_CALL_COMPLETED, self._on_tool_completed_for_persistence
         )
-        
+
         logger.debug("💾 [PersistenceListeners] 持久化监听器已注册")
-    
+
     async def _on_message_sent_for_persistence(self, event: Event) -> None:
         """消息发送后触发保存"""
         await self._trigger_save(event, "message_sent")
-    
+
     async def _on_initiative_for_persistence(self, event: Event) -> None:
         """主动消息后触发保存"""
         await self._trigger_save(event, "initiative")
-    
+
     async def _on_tool_completed_for_persistence(self, event: Event) -> None:
         """工具调用完成后触发保存"""
         await self._trigger_save(event, "tool_completed")
-    
+
     async def _trigger_save(self, event: Event, source: str) -> None:
         """触发保存操作"""
         if not hasattr(self.agent, "save_coordinator"):
             return
-        
+
         # 发布保存开始事件
-        self.event_bus.publish(Event(
-            type=SystemEvent.PERSISTENCE_SAVE_STARTED,
-            source=f"persistence_listeners.{source}",
-            data={"trigger_event_id": event.id}
-        ))
-        
+        self.event_bus.publish(
+            Event(
+                type=SystemEvent.PERSISTENCE_SAVE_STARTED,
+                source=f"persistence_listeners.{source}",
+                data={"trigger_event_id": event.id},
+            )
+        )
+
         try:
             # 执行保存
             success = await self.agent.save_coordinator.save_async(
                 self.agent.working_memory,
-                force=False  # 让 save_coordinator 自己判断
+                force=False,  # 让 save_coordinator 自己判断
             )
-            
+
             # 发布保存完成事件
-            self.event_bus.publish(Event(
-                type=SystemEvent.PERSISTENCE_SAVE_COMPLETED if success else SystemEvent.PERSISTENCE_SAVE_FAILED,
-                source=f"persistence_listeners.{source}",
-                data={
-                    "trigger_event_id": event.id,
-                    "success": success,
-                    "session_id": self._session.session_id if self._session else None
-                }
-            ))
-            
+            self.event_bus.publish(
+                Event(
+                    type=SystemEvent.PERSISTENCE_SAVE_COMPLETED
+                    if success
+                    else SystemEvent.PERSISTENCE_SAVE_FAILED,
+                    source=f"persistence_listeners.{source}",
+                    data={
+                        "trigger_event_id": event.id,
+                        "success": success,
+                        "session_id": self._session.session_id if self._session else None,
+                    },
+                )
+            )
+
         except Exception as e:
             logger.error(f"保存失败: {e}")
-            self.event_bus.publish(Event(
-                type=SystemEvent.PERSISTENCE_SAVE_FAILED,
-                source=f"persistence_listeners.{source}",
-                data={"error": str(e)}
-            ))
+            self.event_bus.publish(
+                Event(
+                    type=SystemEvent.PERSISTENCE_SAVE_FAILED,
+                    source=f"persistence_listeners.{source}",
+                    data={"error": str(e)},
+                )
+            )

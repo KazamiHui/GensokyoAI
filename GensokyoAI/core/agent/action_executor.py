@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 class ActionExecutor:
     """
     行动执行器 - 执行决策
-    
+
     咲夜：行动要快，比我的时停还快！
     """
 
@@ -33,9 +33,7 @@ class ActionExecutor:
     def _subscribe_events(self) -> None:
         """订阅行动决策事件"""
         self.event_bus.subscribe(
-            SystemEvent.ACTION_DECIDED,
-            self._on_action_decided,
-            priority=EventPriority.HIGH
+            SystemEvent.ACTION_DECIDED, self._on_action_decided, priority=EventPriority.HIGH
         )
 
     # ==================== 事件处理 ====================
@@ -62,25 +60,29 @@ class ActionExecutor:
             case _:
                 logger.debug(f"⚡ [ActionExecutor] 未知行动: {action_type}")
 
-        self.event_bus.publish(Event(
-            type=SystemEvent.ACTION_EXECUTED,
-            source="action_executor",
-            data={"action": action_data}
-        ))
+        self.event_bus.publish(
+            Event(
+                type=SystemEvent.ACTION_EXECUTED,
+                source="action_executor",
+                data={"action": action_data},
+            )
+        )
 
     # ==================== 执行方法 ====================
 
     async def _execute_speak(self, event: Event, user_input: str) -> None:
         """执行 SPEAK - 请求生成响应"""
         # 发布生成响应事件，由 ResponseHandler 订阅处理
-        self.event_bus.publish(Event(
-            type=SystemEvent.GENERATE_RESPONSE,
-            source="action_executor",
-            data={
-                "user_input": user_input,
-                "request_id": event.id,
-            }
-        ))
+        self.event_bus.publish(
+            Event(
+                type=SystemEvent.GENERATE_RESPONSE,
+                source="action_executor",
+                data={
+                    "user_input": user_input,
+                    "request_id": event.id,
+                },
+            )
+        )
 
     async def _execute_initiative_speak(self, event: Event) -> None:
         """执行 INITIATIVE_SPEAK - 主动说话"""
@@ -88,16 +90,20 @@ class ActionExecutor:
         message = action_data.get("content", "")
 
         if message:
-            self.event_bus.publish(Event(
-                type=SystemEvent.THINK_ENGINE_INITIATIVE,
-                source="action_executor",
-                data={"message": message}
-            ))
-            self.event_bus.publish(Event(
-                type=SystemEvent.MESSAGE_SENT,
-                source="agent",
-                data={"content": message, "initiative": True}
-            ))
+            self.event_bus.publish(
+                Event(
+                    type=SystemEvent.THINK_ENGINE_INITIATIVE,
+                    source="action_executor",
+                    data={"message": message},
+                )
+            )
+            self.event_bus.publish(
+                Event(
+                    type=SystemEvent.MESSAGE_SENT,
+                    source="agent",
+                    data={"content": message, "initiative": True},
+                )
+            )
 
     async def _execute_wait(self, event: Event) -> None:
         """执行 WAIT - 什么都不做"""
@@ -111,33 +117,36 @@ class ActionExecutor:
     async def _execute_remember(self, event: Event) -> None:
         """执行 REMEMBER - 调用记忆工具"""
         action_data = event.data.get("action", {})
-        self.event_bus.publish(Event(
-            type=SystemEvent.MEMORY_SEMANTIC_ADDED,
-            source="action_executor",
-            data={
-                "content": action_data.get("content", ""),
-                "importance": action_data.get("params", {}).get("importance", 0.5) / 10.0,
-                "topic_name": action_data.get("params", {}).get("topic"),
-            }
-        ))
+        self.event_bus.publish(
+            Event(
+                type=SystemEvent.MEMORY_SEMANTIC_ADDED,
+                source="action_executor",
+                data={
+                    "content": action_data.get("content", ""),
+                    "importance": action_data.get("params", {}).get("importance", 0.5) / 10.0,
+                    "topic_name": action_data.get("params", {}).get("topic"),
+                },
+            )
+        )
 
     async def _execute_recall(self, event: Event) -> None:
         """执行 RECALL - 回忆"""
         action_data = event.data.get("action", {})
         keyword = action_data.get("content", "")
 
-        response = await self.event_bus.request(Event(
-            type=SystemEvent.MEMORY_SEMANTIC_RECALLED,
-            source="action_executor",
-            data={"keyword": keyword}
-        ), timeout=5.0)
+        response = await self.event_bus.request(
+            Event(
+                type=SystemEvent.MEMORY_SEMANTIC_RECALLED,
+                source="action_executor",
+                data={"keyword": keyword},
+            ),
+            timeout=5.0,
+        )
 
         if response:
-            self.event_bus.publish(Event(
-                type=SystemEvent.MESSAGE_SENT,
-                source="agent",
-                data={"content": response}
-            ))
+            self.event_bus.publish(
+                Event(type=SystemEvent.MESSAGE_SENT, source="agent", data={"content": response})
+            )
 
     # ==================== 流式响应支持 ====================
 

@@ -18,6 +18,7 @@ set_exechook()
 
 console = Console()
 
+
 def parse_args():
     """解析命令行参数"""
     parser = argparse.ArgumentParser(description="GensokyoAI - 幻想乡 AI 角色扮演引擎")

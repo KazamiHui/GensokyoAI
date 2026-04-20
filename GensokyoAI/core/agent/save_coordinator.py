@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 class SaveCoordinator:
     """
     保存协调器 - 管理异步保存的去重和状态
-    
+
     灵梦：保存这种事，能省则省，但不能不存~
     """
 
@@ -67,7 +67,7 @@ class SaveCoordinator:
     def should_save(self, working_memory: "WorkingMemoryManager", force: bool = False) -> bool:
         """
         判断是否应该保存
-        
+
         魔理沙：重要的东西才值得保存DA☆ZE！
         """
         if force or self._shutting_down:
@@ -77,7 +77,7 @@ class SaveCoordinator:
             return False
 
         current_turn = len(working_memory) // 2
-        
+
         # 轮数没变，不保存
         if current_turn <= self._last_saved_turn:
             return False

@@ -140,11 +140,13 @@ class Agent:
         self._action_executor: Optional[ActionExecutor] = None
 
     def _publish_started_event(self) -> None:
-        self.event_bus.publish(Event(
-            type=SystemEvent.AGENT_STARTED,
-            source="agent",
-            data={"character": self.config.character.name}  # type: ignore
-        ))
+        self.event_bus.publish(
+            Event(
+                type=SystemEvent.AGENT_STARTED,
+                source="agent",
+                data={"character": self.config.character.name},  # type: ignore
+            )
+        )
 
     def _build_system_prompt(self) -> str:
         if not self.config.character:
@@ -160,7 +162,9 @@ class Agent:
             if not current_session:
                 raise AgentError("No active session for semantic memory")
 
-            memory_path = self._memory_base_path / self.character_name / "memory" / current_session.session_id
+            memory_path = (
+                self._memory_base_path / self.character_name / "memory" / current_session.session_id
+            )
             memory_path.mkdir(parents=True, exist_ok=True)
 
             self._semantic_memory = SemanticMemoryManager(
@@ -175,7 +179,9 @@ class Agent:
         if not current_session:
             raise AgentError("No active session")
         if not self._working_memory:
-            self._working_memory = self.session_manager.get_working_memory(current_session.session_id)
+            self._working_memory = self.session_manager.get_working_memory(
+                current_session.session_id
+            )
         return self._working_memory
 
     @property
@@ -222,20 +228,24 @@ class Agent:
 
     # ==================== 核心 API ====================
 
-    async def send(self, user_input: str, system_contexts: list[str] | None = None) -> Message | None:
+    async def send(
+        self, user_input: str, system_contexts: list[str] | None = None
+    ) -> Message | None:
         """发送消息（非流式）- 完全事件驱动"""
         if self.is_shutting_down:
             return None
 
         # 准备接收响应
-        response_future = self._action_executor.prepare_response() # type: ignore
+        response_future = self._action_executor.prepare_response()  # type: ignore
 
         # 发布消息接收事件
-        self.event_bus.publish(Event(
-            type=SystemEvent.MESSAGE_RECEIVED,
-            source="agent",
-            data={"content": user_input, "system_contexts": system_contexts}
-        ))
+        self.event_bus.publish(
+            Event(
+                type=SystemEvent.MESSAGE_RECEIVED,
+                source="agent",
+                data={"content": user_input, "system_contexts": system_contexts},
+            )
+        )
 
         try:
             full_response = await asyncio.wait_for(response_future, timeout=60.0)
@@ -255,21 +265,23 @@ class Agent:
             return
 
         # 准备接收响应
-        response_future = self._action_executor.prepare_response() # type: ignore
+        response_future = self._action_executor.prepare_response()  # type: ignore
 
         # 发布消息接收事件
-        self.event_bus.publish(Event(
-            type=SystemEvent.MESSAGE_RECEIVED,
-            source="agent",
-            data={"content": user_input, "system_contexts": system_contexts}
-        ))
+        self.event_bus.publish(
+            Event(
+                type=SystemEvent.MESSAGE_RECEIVED,
+                source="agent",
+                data={"content": user_input, "system_contexts": system_contexts},
+            )
+        )
 
         # 流式返回
         full_response = ""
         try:
             while True:
                 try:
-                    chunk = await asyncio.wait_for(self._action_executor.get_chunk(), timeout=0.1) # type: ignore
+                    chunk = await asyncio.wait_for(self._action_executor.get_chunk(), timeout=0.1)  # type: ignore
                     if chunk:
                         full_response += chunk
                         yield StreamChunk(content=chunk)
@@ -278,7 +290,7 @@ class Agent:
                         break
                     continue
         finally:
-            self._action_executor.complete_response(full_response) # type: ignore
+            self._action_executor.complete_response(full_response)  # type: ignore
 
     # ==================== 会话管理 ====================
 
@@ -286,11 +298,9 @@ class Agent:
         session = self.session_manager.create_session()
         self._working_memory = None
         self._semantic_memory = None
-        self.event_bus.publish(Event(
-            type=SystemEvent.SESSION_CREATED,
-            source="agent",
-            data={"session": session}
-        ))
+        self.event_bus.publish(
+            Event(type=SystemEvent.SESSION_CREATED, source="agent", data={"session": session})
+        )
         return session
 
     def resume_session(self, session_id: str) -> bool:
@@ -298,11 +308,9 @@ class Agent:
             self._working_memory = None
             self._semantic_memory = None
             session = self.session_manager.get_current_session()
-            self.event_bus.publish(Event(
-                type=SystemEvent.SESSION_RESUMED,
-                source="agent",
-                data={"session": session}
-            ))
+            self.event_bus.publish(
+                Event(type=SystemEvent.SESSION_RESUMED, source="agent", data={"session": session})
+            )
             return True
         return False
 
@@ -370,26 +378,24 @@ class Agent:
                 break
             if chunk.content:
                 full_response += chunk.content
-                await self._action_executor.feed_chunk(chunk.content) # type: ignore
+                await self._action_executor.feed_chunk(chunk.content)  # type: ignore
 
-        self._action_executor.complete_response(full_response) # type: ignore
+        self._action_executor.complete_response(full_response)  # type: ignore
 
         if full_response:
-            
             # 发布 MESSAGE_SENT 事件（让其他监听器知道）
-            self.event_bus.publish(Event(
-                type=SystemEvent.MESSAGE_SENT,
-                source="agent",
-                data={"content": full_response}
-            ))
-            
+            self.event_bus.publish(
+                Event(
+                    type=SystemEvent.MESSAGE_SENT, source="agent", data={"content": full_response}
+                )
+            )
 
     async def _on_shutdown(self) -> None:
         self.event_bus.publish(Event(type=SystemEvent.AGENT_SHUTDOWN, source="agent"))
 
         if self._think_engine:
             await self._think_engine.stop()
-            
+
         if self._background_manager:
             await self._background_manager.stop(wait=True)
 

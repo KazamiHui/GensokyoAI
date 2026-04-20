@@ -75,7 +75,7 @@ def sys_excepthook(exctype: type[BaseException], value: BaseException, tb):
         if type(value) is SystemExit:
             logger.warning(f"程序退出，退出码: {value.code}")
         return
-    
+
     exception_info = extract_exception(exctype, value, tb)
     if exception_info:
         for exception_element in exception_info:

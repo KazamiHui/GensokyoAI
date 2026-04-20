@@ -39,7 +39,7 @@ def _json_encoder(obj):
 class TopicAwareStore:
     """
     话题感知存储 - 幻想乡最强记忆体
-    
+
     能力：
     - 自主命名话题 (比琪露诺聪明多了)
     - 情感标记记忆 (比古明地觉还会读心)
@@ -267,7 +267,7 @@ class TopicAwareStore:
     ) -> Optional[Topic]:
         """
         添加语义记忆！
-        
+
         - 魔理沙：借来的记忆也要好好保存DA☆ZE！
         - 咲夜：比我的时停还快（异步嘛）
         """
@@ -277,7 +277,7 @@ class TopicAwareStore:
         memory = TopicMemory(
             content=content,
             importance=importance,
-            emotional_impact=abs(emotional_valence), # 泪目了！
+            emotional_impact=abs(emotional_valence),  # 泪目了！
         )
         self._memories[memory.id] = memory
 
@@ -288,7 +288,7 @@ class TopicAwareStore:
                 topic_id = self._topic_name_index[topic_name_lower]
                 topic = self._topics[topic_id]
                 self._update_topic(topic, memory, importance, 10.0, emotional_valence)
-                self._refresh_topic(topic, boost=0.05) 
+                self._refresh_topic(topic, boost=0.05)
                 await self._save_async()
                 logger.debug(f"更新现有话题(由AI指定): {topic.name}")
                 return topic

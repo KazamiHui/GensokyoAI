@@ -39,6 +39,7 @@ class TopicGenerationConfig(Struct):
     name_max_length: int = 10
     summary_max_length: int = 100
 
+
 class MemoryConfig(Struct):
     """记忆配置"""
 

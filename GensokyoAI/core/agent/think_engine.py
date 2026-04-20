@@ -13,6 +13,7 @@ from .model_client import ModelClient
 from ..events import EventBus, SystemEvent, Event
 from ..config import ThinkEngineConfig
 
+
 # 为了研发这个引擎，下面是一个小故事：
 # 上白泽慧音：
 #  - **我思故我在，思想是一个人的重要组成部分！**
@@ -21,7 +22,7 @@ from ..config import ThinkEngineConfig
 class ThinkEngine:
     """
     静默思考引擎 - 让 AI 拥有自己的心理时间
-    
+
     职责：
     - 定时触发思考
     - 随机游走话题图谱，产生联想
@@ -103,7 +104,9 @@ class ThinkEngine:
 
         if emotional_topics and random.random() < self.config.emotional_priority_probability:
             start_topic = random.choice(emotional_topics)
-            logger.debug(f"🧠 [ThinkEngine] {self.character_name} 优先选择高情感话题: {start_topic.name}")
+            logger.debug(
+                f"🧠 [ThinkEngine] {self.character_name} 优先选择高情感话题: {start_topic.name}"
+            )
         else:
             start_topic = random.choice(topics)
 
@@ -144,7 +147,9 @@ class ThinkEngine:
 只思考，不行动。记住你是{self.character_name}。
 """
 
-        logger.debug(f"🧠 [ThinkEngine] {self.character_name} 正在静默思考，游走话题: {[t.name for t in walk]}")
+        logger.debug(
+            f"🧠 [ThinkEngine] {self.character_name} 正在静默思考，游走话题: {[t.name for t in walk]}"
+        )
 
         try:
             response = await self.model_client.client.chat(
@@ -163,23 +168,25 @@ class ThinkEngine:
 
                 # 🆕 只发布思考事件，不判断意图，不生成消息
                 # 决策交给 ActionPlanner
-                self.event_bus.publish(Event(
-                    type=SystemEvent.THINK_ENGINE_THOUGHT,
-                    source="think_engine",
-                    data={
-                        "character": self.character_name,
-                        "thought": thought,
-                        "topics": [t.name for t in walk],
-                        "topics_detail": [
-                            {
-                                "name": t.name,
-                                "summary": t.summary,
-                                "emotional_valence": t.emotional_valence,
-                            }
-                            for t in walk[:3]
-                        ]
-                    }
-                ))
+                self.event_bus.publish(
+                    Event(
+                        type=SystemEvent.THINK_ENGINE_THOUGHT,
+                        source="think_engine",
+                        data={
+                            "character": self.character_name,
+                            "thought": thought,
+                            "topics": [t.name for t in walk],
+                            "topics_detail": [
+                                {
+                                    "name": t.name,
+                                    "summary": t.summary,
+                                    "emotional_valence": t.emotional_valence,
+                                }
+                                for t in walk[:3]
+                            ],
+                        },
+                    )
+                )
             else:
                 logger.debug(f"🤫 [ThinkEngine] {self.character_name} 思考了但内容为空")
 

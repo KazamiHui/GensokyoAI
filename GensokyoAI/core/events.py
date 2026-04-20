@@ -42,9 +42,9 @@ class SystemEvent(Enum):
     MESSAGE_STREAM_CHUNK = "message.stream.chunk"
 
     # 🆕 响应生成事件（替代直接调用）
-    GENERATE_RESPONSE = "generate.response"      # 请求生成响应
-    RESPONSE_STREAMING = "response.streaming"    # 流式响应中
-    RESPONSE_COMPLETED = "response.completed"    # 响应完成
+    GENERATE_RESPONSE = "generate.response"  # 请求生成响应
+    RESPONSE_STREAMING = "response.streaming"  # 流式响应中
+    RESPONSE_COMPLETED = "response.completed"  # 响应完成
 
     # 记忆事件
     MEMORY_WORKING_ADDED = "memory.working.added"
@@ -76,12 +76,12 @@ class SystemEvent(Enum):
     BACKGROUND_TASK_FAILED = "background.task.failed"
 
     # 思考引擎事件
-    THINK_ENGINE_THOUGHT = "think.engine.thought"        # 静默思考完成
+    THINK_ENGINE_THOUGHT = "think.engine.thought"  # 静默思考完成
     THINK_ENGINE_INITIATIVE = "think.engine.initiative"  # 产生主动消息
 
     # 🆕 行动决策事件
-    ACTION_DECIDED = "action.decided"       # ActionPlanner 决策完成
-    ACTION_EXECUTED = "action.executed"     # ActionExecutor 执行完成
+    ACTION_DECIDED = "action.decided"  # ActionPlanner 决策完成
+    ACTION_EXECUTED = "action.executed"  # ActionExecutor 执行完成
 
 
 class Event(Struct):
@@ -267,7 +267,9 @@ class EventBus:
                 if sub.id == subscription_id:
                     subs.remove(sub)
                     if self.enable_trace:
-                        logger.debug(f"🔕 [EventBus] 取消订阅: {subscription_id} ({sub.handler_name})")
+                        logger.debug(
+                            f"🔕 [EventBus] 取消订阅: {subscription_id} ({sub.handler_name})"
+                        )
                     return True
         return False
 
@@ -328,7 +330,9 @@ class EventBus:
         subscribers = self._subscribers[event.type]
 
         if self.enable_trace:
-            logger.debug(f"🔄 [EventBus] 处理事件 '{event.type.value}' -> {len(subscribers)} 个订阅者")
+            logger.debug(
+                f"🔄 [EventBus] 处理事件 '{event.type.value}' -> {len(subscribers)} 个订阅者"
+            )
 
         results = []
         to_remove = []
@@ -369,11 +373,13 @@ class EventBus:
                 if self.enable_trace:
                     logger.error(f"   ❌ [EventBus] {sub.handler_name} 执行失败: {e}")
 
-                self.publish(Event(
-                    type=SystemEvent.ERROR_OCCURRED,
-                    source="eventbus",
-                    data={"handler": sub.handler_name, "error": str(e)}
-                ))
+                self.publish(
+                    Event(
+                        type=SystemEvent.ERROR_OCCURRED,
+                        source="eventbus",
+                        data={"handler": sub.handler_name, "error": str(e)},
+                    )
+                )
 
         for sub in to_remove:
             self._subscribers[event.type].remove(sub)

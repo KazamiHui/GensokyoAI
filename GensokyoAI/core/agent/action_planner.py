@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 class ActionPlanner:
     """
     行动规划器 - Agent 的大脑
-    
+
     慧音：三思而后行！
     紫：边界要模糊，考虑多种可能！
     灵梦：简单点，能偷懒就偷懒~
@@ -48,9 +48,7 @@ class ActionPlanner:
     def _subscribe_events(self) -> None:
         """订阅需要决策的事件"""
         self.event_bus.subscribe(
-            SystemEvent.MESSAGE_RECEIVED,
-            self._on_message_received,
-            priority=EventPriority.HIGHEST
+            SystemEvent.MESSAGE_RECEIVED, self._on_message_received, priority=EventPriority.HIGHEST
         )
         self.event_bus.subscribe(
             SystemEvent.THINK_ENGINE_THOUGHT,
@@ -102,10 +100,11 @@ class ActionPlanner:
 
     async def _decide_initiative_action(self, thought: str, topics_detail: list) -> Action:
         """决定是否主动说话"""
-        topics_desc = "\n".join(
-            f"- {t.get('name', '')}: {t.get('summary', '')}"
-            for t in topics_detail
-        ) if topics_detail else "无"
+        topics_desc = (
+            "\n".join(f"- {t.get('name', '')}: {t.get('summary', '')}" for t in topics_detail)
+            if topics_detail
+            else "无"
+        )
 
         prompt = f"""你是 {self.character_name}，刚刚在静默思考：
 
@@ -126,7 +125,7 @@ class ActionPlanner:
             )
 
             result_text = response.message.content.strip()  # type: ignore
-            json_match = re.search(r'\{[^{}]*\}', result_text)
+            json_match = re.search(r"\{[^{}]*\}", result_text)
 
             if json_match:
                 data = json.loads(json_match.group())
@@ -134,8 +133,7 @@ class ActionPlanner:
                     message = data.get("message", "").strip()
                     if message:
                         return ActionFactory.initiative_speak(
-                            content=message,
-                            reason=data.get("reason", "主动想说")
+                            content=message, reason=data.get("reason", "主动想说")
                         )
         except Exception as e:
             logger.error(f"决策主动行动失败: {e}")
@@ -146,15 +144,17 @@ class ActionPlanner:
 
     def _publish_action(self, action: Action, trigger_event: Optional[Event] = None) -> None:
         """发布行动决策事件"""
-        self.event_bus.publish(Event(
-            type=SystemEvent.ACTION_DECIDED,
-            source="action_planner",
-            data={
-                "action": action.to_dict(),
-                "trigger_event_id": trigger_event.id if trigger_event else None,
-                "user_input": trigger_event.data.get("content") if trigger_event else None,
-            }
-        ))
+        self.event_bus.publish(
+            Event(
+                type=SystemEvent.ACTION_DECIDED,
+                source="action_planner",
+                data={
+                    "action": action.to_dict(),
+                    "trigger_event_id": trigger_event.id if trigger_event else None,
+                    "user_input": trigger_event.data.get("content") if trigger_event else None,
+                },
+            )
+        )
         logger.info(f"🧠 [ActionPlanner] 决策: {action.type.name} - {action.reason}")
 
     def _record_action(self, action: Action) -> None:

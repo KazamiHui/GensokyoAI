@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 class ResponseHandler:
     """
     响应处理器 - 纯响应生成，不操作工作记忆
-    
+
     魔理沙：只管说话，记东西交给别人DA☆ZE！
     """
 
@@ -66,11 +66,14 @@ class ResponseHandler:
 
     async def _record_tool_results(self, results: list[dict]) -> None:
         for r in results:
-            await self._episodic_memory.add_message(MemoryRecord(
-                content=r["content"], role="tool",
-                character_id=self.character_name,
-                metadata={"tool_name": r.get("name", "")}
-            ))
+            await self._episodic_memory.add_message(
+                MemoryRecord(
+                    content=r["content"],
+                    role="tool",
+                    character_id=self.character_name,
+                    metadata={"tool_name": r.get("name", "")},
+                )
+            )
 
     # ==================== 响应处理 ====================
 
