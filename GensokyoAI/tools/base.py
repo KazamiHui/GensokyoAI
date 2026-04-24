@@ -38,13 +38,19 @@ class ToolDefinition(Struct):
     func: Callable
     is_async: bool = False
 
-    def to_openai_schema(self) -> dict:
-        """转换为 OpenAI 工具格式"""
+    def to_openai_schema(self, strict: bool = False) -> dict:
+        """转换为 OpenAI 工具格式
+
+        Args:
+            strict: 是否启用 strict 模式（OpenAI 官方推荐启用，
+                    但第三方兼容服务可能不支持）。启用时会添加
+                    ``strict: true`` 和 ``additionalProperties: false``。
+        """
         properties = {}
         required = []
 
         for name, param in self.parameters.items():
-            prop = {"type": param.type.value, "description": param.description}
+            prop: dict = {"type": param.type.value, "description": param.description}
             if param.default is not None:
                 prop["default"] = param.default
             if param.items:
@@ -55,17 +61,29 @@ class ToolDefinition(Struct):
             if param.required:
                 required.append(name)
 
+        parameters: dict = {
+            "type": "object",
+            "properties": properties,
+            "required": required,
+        }
+
+        # strict 模式要求 additionalProperties: false
+        if strict:
+            parameters["additionalProperties"] = False
+
+        function_def: dict = {
+            "name": self.name,
+            "description": self.description,
+            "parameters": parameters,
+        }
+
+        # strict 模式标记
+        if strict:
+            function_def["strict"] = True
+
         return {
             "type": "function",
-            "function": {
-                "name": self.name,
-                "description": self.description,
-                "parameters": {
-                    "type": "object",
-                    "properties": properties,
-                    "required": required,
-                },
-            },
+            "function": function_def,
         }
 
 

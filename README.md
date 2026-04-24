@@ -88,7 +88,8 @@
 | Provider | 说明 | 安装 |
 |----------|------|------|
 | **Ollama** | 本地模型（默认） | `pip install gensokyoai[ollama]` |
-| **OpenAI** | OpenAI / Deepseek / SiliconFlow / vLLM 等兼容 API | `pip install gensokyoai[openai]` |
+| **OpenAI** | OpenAI / Deepseek / SiliconFlow / vLLM 等兼容 API（Chat Completions） | `pip install gensokyoai[openai]` |
+| **OpenAI Responses** | OpenAI 官方 Responses API（推理性能更优） | `pip install gensokyoai[openai]` |
 | **Claude** | Anthropic Claude 系列 | `pip install gensokyoai[claude]` |
 | **Gemini** | Google Gemini 系列 | `pip install gensokyoai[gemini]` |
 
@@ -153,7 +154,7 @@ pip install google-genai           # Google Gemini
 ollama pull qwen3.5:9b
 ```
 
-**使用 OpenAI / Deepseek 等**
+**使用 OpenAI / Deepseek 等（Chat Completions API）**
 
 编辑 `config/default.yaml`：
 ```yaml
@@ -163,6 +164,17 @@ model:
   api_key: "sk-..."
   base_url: "https://api.deepseek.com/v1" # 可选，不填则使用 OpenAI 官方
 ```
+
+**使用 OpenAI Responses API（推荐用于 OpenAI 官方）**
+
+```yaml
+model:
+  provider: "openai_responses"
+  name: "gpt-5"
+  api_key: "sk-..."
+```
+
+> 💡 **OpenAI 双 API 支持**：`openai` Provider 使用 Chat Completions API，兼容所有 OpenAI 兼容的第三方服务；`openai_responses` Provider 使用 Responses API，仅限 OpenAI 官方，可获得更优的推理性能和更低的成本。
 
 **使用 Claude**
 ```yaml
@@ -271,7 +283,8 @@ GensokyoAI/
 │   │   │   ├── providers/     # 🆕 LLM Provider 插件目录
 │   │   │   │   ├── base.py    # Provider 抽象基类
 │   │   │   │   ├── ollama_provider.py  # Ollama 实现
-│   │   │   │   ├── openai_provider.py  # OpenAI 兼容实现
+│   │   │   │   ├── openai_provider.py  # OpenAI Chat Completions 兼容实现
+│   │   │   │   ├── openai_responses_provider.py  # 🆕 OpenAI Responses API 实现
 │   │   │   │   ├── claude_provider.py  # Claude 实现
 │   │   │   │   └── gemini_provider.py  # Gemini 实现
 │   │   │   ├── message_builder.py # 消息构建器

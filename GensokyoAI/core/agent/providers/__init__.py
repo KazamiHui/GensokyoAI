@@ -44,11 +44,19 @@ class ProviderFactory:
 
         cls._registry["ollama"] = OllamaProvider
 
-        # OpenAI - 尝试注册
+        # OpenAI Chat Completions - 尝试注册
         try:
             from .openai_provider import OpenAIProvider
 
             cls._registry["openai"] = OpenAIProvider
+        except ImportError:
+            pass
+
+        # OpenAI Responses API - 尝试注册
+        try:
+            from .openai_responses_provider import OpenAIResponsesProvider
+
+            cls._registry["openai_responses"] = OpenAIResponsesProvider
         except ImportError:
             pass
 

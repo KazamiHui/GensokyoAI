@@ -80,14 +80,21 @@ class OpenAIProvider(BaseProvider):
             "top_p": options.get("top_p", 0.9),
         }
 
-        # max_tokens 映射
-        max_tokens = options.get("num_predict") or options.get("max_tokens")
+        # max_tokens 映射：优先使用 max_completion_tokens（新版 API 推荐），回退到 max_tokens
+        max_tokens = (
+            options.get("max_completion_tokens")
+            or options.get("num_predict")
+            or options.get("max_tokens")
+        )
         if max_tokens:
-            call_kwargs["max_tokens"] = max_tokens
+            call_kwargs["max_completion_tokens"] = max_tokens
 
         # 工具支持
         if tools:
             call_kwargs["tools"] = self._convert_tools_to_openai(tools)
+            # tool_choice 支持：auto / required / none / 指定函数
+            if tool_choice := options.get("tool_choice"):
+                call_kwargs["tool_choice"] = tool_choice
 
         response = await self._client.chat.completions.create(**call_kwargs)
 
@@ -112,12 +119,19 @@ class OpenAIProvider(BaseProvider):
             "stream": True,
         }
 
-        max_tokens = options.get("num_predict") or options.get("max_tokens")
+        # max_tokens 映射：优先使用 max_completion_tokens（新版 API 推荐），回退到 max_tokens
+        max_tokens = (
+            options.get("max_completion_tokens")
+            or options.get("num_predict")
+            or options.get("max_tokens")
+        )
         if max_tokens:
-            call_kwargs["max_tokens"] = max_tokens
+            call_kwargs["max_completion_tokens"] = max_tokens
 
         if tools:
             call_kwargs["tools"] = self._convert_tools_to_openai(tools)
+            if tool_choice := options.get("tool_choice"):
+                call_kwargs["tool_choice"] = tool_choice
 
         # 流式工具调用累积器
         tool_calls_acc: dict[int, dict] = {}
@@ -135,9 +149,12 @@ class OpenAIProvider(BaseProvider):
                     idx = tc.index
                     if idx not in tool_calls_acc:
                         tool_calls_acc[idx] = {
+                            "id": "",
                             "name": "",
                             "arguments": "",
                         }
+                    if tc.id:
+                        tool_calls_acc[idx]["id"] = tc.id
                     if tc.function:
                         if tc.function.name:
                             tool_calls_acc[idx]["name"] = tc.function.name
@@ -161,10 +178,11 @@ class OpenAIProvider(BaseProvider):
                         args = {}
                     unified_tool_calls.append(
                         ToolCall(
+                            id=tc_data.get("id", ""),
                             function=ToolCallFunction(
                                 name=tc_data["name"],
                                 arguments=args,
-                            )
+                            ),
                         )
                     )
 
@@ -185,10 +203,20 @@ class OpenAIProvider(BaseProvider):
         **kwargs,
     ) -> UnifiedEmbeddingResponse:
         """获取文本向量"""
-        response = await self._client.embeddings.create(
-            model=model,
-            input=prompt,
-        )
+        embed_kwargs: dict = {
+            "model": model,
+            "input": prompt,
+        }
+
+        # 支持 dimensions 参数（text-embedding-3-* 模型支持缩短向量维度）
+        if dimensions := kwargs.get("dimensions"):
+            embed_kwargs["dimensions"] = dimensions
+
+        # 支持 encoding_format 参数（float / base64）
+        if encoding_format := kwargs.get("encoding_format"):
+            embed_kwargs["encoding_format"] = encoding_format
+
+        response = await self._client.embeddings.create(**embed_kwargs)
 
         return UnifiedEmbeddingResponse(
             embedding=response.data[0].embedding,
@@ -223,10 +251,11 @@ class OpenAIProvider(BaseProvider):
                     args = {}
                 tool_calls.append(
                     ToolCall(
+                        id=tc.id or "",
                         function=ToolCallFunction(
                             name=tc.function.name or "",
                             arguments=args,
-                        )
+                        ),
                     )
                 )
 
@@ -249,19 +278,19 @@ class OpenAIProvider(BaseProvider):
     @staticmethod
     def _convert_tools_to_openai(tools: list[dict]) -> list[dict]:
         """
-        将 Ollama 格式的工具定义转换为 OpenAI 格式
+        验证并规范化工具定义为 OpenAI Chat Completions 格式
 
-        Ollama 格式:
+        期望输入格式（由 ToolDefinition.to_openai_schema() 生成）:
           {"type": "function", "function": {"name": "...", "description": "...", "parameters": {...}}}
 
-        OpenAI 格式基本一致，但某些字段可能有差异
+        如果输入缺少外层包装，会自动适配。
         """
         openai_tools = []
         for tool in tools:
-            # 如果已经是 OpenAI 格式，直接使用
+            # 如果已经是标准 OpenAI 格式（外部标记多态），直接使用
             if "type" in tool and "function" in tool:
                 openai_tools.append(tool)
             else:
-                # 尝试适配
+                # 缺少外层包装，自动适配
                 openai_tools.append({"type": "function", "function": tool})
         return openai_tools

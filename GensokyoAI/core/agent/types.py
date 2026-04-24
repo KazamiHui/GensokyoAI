@@ -15,6 +15,7 @@ class ToolCallFunction(Struct):
 class ToolCall(Struct):
     """工具调用"""
 
+    id: str = ""  # OpenAI tool call ID（如 call_abc123），用于关联 tool 结果消息
     function: ToolCallFunction = field(default_factory=ToolCallFunction)
 
 

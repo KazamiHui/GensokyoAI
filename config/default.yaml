@@ -7,7 +7,7 @@ log_file: "logs/GENSOKYOAI.log"
 
 # 模型配置
 model:
-  provider: "ollama"    # LLM Provider: ollama / openai / gemini / claude
+  provider: "ollama"    # LLM Provider: ollama / openai / openai_responses / gemini / claude
   name: "qwen3.5:9b"
   base_url: null        # null 表示使用默认地址（ollama: http://127.0.0.1:11434）
   api_key: null         # API 密钥（OpenAI/Gemini/Claude 等需要，ollama 不需要）
@@ -27,10 +27,17 @@ model:
 #   name: "qwen3.5:9b"
 #   base_url: null              # 默认 http://127.0.0.1:11434
 #
-# --- OpenAI ---
+# --- OpenAI (Chat Completions API，兼容第三方服务) ---
 # model:
 #   provider: "openai"
 #   name: "gpt-4o"
+#   api_key: "sk-..."
+#   base_url: null              # 默认 https://api.openai.com/v1
+#
+# --- OpenAI Responses API（仅限 OpenAI 官方，推理性能更优） ---
+# model:
+#   provider: "openai_responses"
+#   name: "gpt-5"
 #   api_key: "sk-..."
 #   base_url: null              # 默认 https://api.openai.com/v1
 #
