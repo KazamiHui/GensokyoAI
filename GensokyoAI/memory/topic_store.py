@@ -212,10 +212,8 @@ class TopicAwareStore:
 只返回 JSON，格式：{{"1": 9, "2": 3}}"""
 
         try:
-            response = await model_client.client.chat(
-                model=model_client.model_name,
+            response = await model_client.chat(
                 messages=[{"role": "user", "content": prompt}],
-                stream=False,
                 options={"temperature": 0.1, "num_predict": 100},
             )
 

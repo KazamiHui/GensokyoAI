@@ -4,9 +4,7 @@
 
 from typing import AsyncIterator, TYPE_CHECKING
 
-from ollama import Message, ChatResponse
-
-from .model_client import StreamChunk
+from .types import UnifiedMessage, UnifiedResponse, StreamChunk
 from ...utils.logger import logger
 from ...utils.helpers import safe_get
 from ...memory.types import MemoryRecord
@@ -56,7 +54,7 @@ class ResponseHandler:
 
     # ==================== 工具处理 ====================
 
-    async def _handle_tool_calls(self, message: Message) -> list[dict] | None:
+    async def _handle_tool_calls(self, message: UnifiedMessage) -> list[dict] | None:
         if not message.tool_calls:
             return None
         logger.info(f"检测到 {len(message.tool_calls)} 个工具调用")
@@ -81,7 +79,7 @@ class ResponseHandler:
         self, messages: list[dict[str, str]], tools: list[dict] | None
     ) -> AsyncIterator[StreamChunk]:
         """处理流式响应"""
-        tool_calls_message: Message | None = None
+        tool_calls_message: UnifiedMessage | None = None
 
         # 第一次流式调用
         async for chunk in self._safe_stream(messages, tools, "第一次流式调用"):
@@ -123,7 +121,7 @@ class ResponseHandler:
             yield StreamChunk(content=f"\n[响应中断: {e}]\n")
 
 
-    async def _safe_tool_calls(self, message: Message) -> list[dict] | None:
+    async def _safe_tool_calls(self, message: UnifiedMessage) -> list[dict] | None:
         """带容错的工具调用"""
         try:
             return await self._handle_tool_calls(message)

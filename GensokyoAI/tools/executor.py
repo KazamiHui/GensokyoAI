@@ -6,7 +6,7 @@ import json
 import asyncio
 from typing import TYPE_CHECKING, Optional, Any
 
-from ollama import Message
+from ..core.agent.types import UnifiedMessage
 
 from .registry import ToolRegistry
 from ..utils.logger import logger
@@ -28,8 +28,8 @@ class ToolExecutor:
         """注入事件总线"""
         self._event_bus = event_bus
 
-    def parse_tool_calls(self, message: Message) -> list[dict[str, Any]]:
-        """从 Message 对象解析工具调用"""
+    def parse_tool_calls(self, message: UnifiedMessage) -> list[dict[str, Any]]:
+        """从 UnifiedMessage 对象解析工具调用"""
         if not message.tool_calls:
             return []
 

@@ -22,15 +22,17 @@ class LogLevel(Enum):
 class ModelConfig(Struct):
     """模型配置"""
 
+    provider: str = "ollama"  # LLM Provider: ollama / openai / gemini / claude
     name: str = "qwen3.5:9b"
     base_url: str | None = None
+    api_key: str | None = None  # API 密钥（OpenAI/Gemini/Claude 等需要）
     stream: bool = True
     think: bool = False
     temperature: float = 0.7
     top_p: float = 0.9
     max_tokens: int = 2048
     timeout: int = 60
-    use_proxy: bool = False  # 🆕 是否使用代理
+    use_proxy: bool = False  # 是否使用代理
 
 
 class TopicGenerationConfig(Struct):
@@ -223,8 +225,10 @@ class ConfigLoader:
     def _merge_model(self, base: ModelConfig, override: ModelConfig) -> ModelConfig:
         """合并模型配置 - override 优先"""
         return ModelConfig(
+            provider=override.provider if override.provider != "ollama" else base.provider,
             name=override.name if override.name != "qwen3.5:9b" else base.name,
             base_url=override.base_url or base.base_url,
+            api_key=override.api_key or base.api_key,
             stream=override.stream,
             think=override.think,
             temperature=override.temperature if override.temperature != 0.7 else base.temperature,
@@ -321,8 +325,14 @@ class ConfigLoader:
 
     def _apply_env(self, config: AppConfig) -> AppConfig:
         """应用环境变量"""
+        if os.getenv("GENSOKYOAI_PROVIDER"):
+            config.model.provider = os.getenv("GENSOKYOAI_PROVIDER")  # type: ignore
         if os.getenv("GENSOKYOAI_MODEL"):
             config.model.name = os.getenv("GENSOKYOAI_MODEL")  # type: ignore
+        if os.getenv("GENSOKYOAI_API_KEY"):
+            config.model.api_key = os.getenv("GENSOKYOAI_API_KEY")  # type: ignore
+        if os.getenv("GENSOKYOAI_BASE_URL"):
+            config.model.base_url = os.getenv("GENSOKYOAI_BASE_URL")  # type: ignore
         if os.getenv("GENSOKYOAI_LOG_LEVEL"):
             config.log_level = LogLevel(os.getenv("GENSOKYOAI_LOG_LEVEL"))
         if os.getenv("GENSOKYOAI_LOG_CONSOLE"):

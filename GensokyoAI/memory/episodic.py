@@ -102,13 +102,12 @@ class EpisodicMemoryManager:
             if not self._model_client:
                 raise MemorySystemError("没有模型客户端！")
 
-            response = await self._model_client.client.chat(
-                model=self.config.episodic_summary_model,
+            response = await self._model_client.chat(
                 messages=[{"role": "user", "content": prompt}],
-                stream=False,
+                model=self.config.episodic_summary_model,
                 options={"temperature": 0.3},
             )
-            return response.message.content.strip()  # type: ignore
+            return response.message.content.strip()
         except Exception as e:
             logger.error(f"生成摘要失败: {e}")
             return f"[压缩摘要] 共 {len(messages)} 条消息"

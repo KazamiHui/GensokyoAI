@@ -152,10 +152,8 @@ class ThinkEngine:
         )
 
         try:
-            response = await self.model_client.client.chat(
-                model=self.model_client.model_name,
+            response = await self.model_client.chat(
                 messages=[{"role": "system", "content": prompt}],
-                stream=False,
                 options={
                     "temperature": self.config.think_temperature,
                     "num_predict": self.config.think_max_tokens,

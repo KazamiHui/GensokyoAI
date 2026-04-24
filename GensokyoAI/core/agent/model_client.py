@@ -1,52 +1,34 @@
-"""模型客户端 - 封装 Ollama 异步调用"""
+"""模型客户端 - Facade 模式，委托给可插拔的 Provider"""
 
 # GensokyoAI/core/agent/model_client.py
 
 import asyncio
-import os
 from typing import AsyncIterator, Optional
 
-from ollama import AsyncClient as OllamaAsyncClient
-from ollama import ChatResponse, EmbeddingsResponse
-from msgspec import Struct
-
+from .types import UnifiedResponse, UnifiedMessage, UnifiedEmbeddingResponse, StreamChunk
+from .providers import ProviderFactory, BaseProvider
 from ..config import ModelConfig
 from ..exceptions import ModelError
 from ..events import Event, SystemEvent, EventBus
 from ...utils.logger import logger
 
 
-class StreamChunk(Struct):
-    """流式响应块"""
-
-    content: str = ""
-    is_tool_call: bool = False
-    tool_info: dict | None = None
-
-
 class ModelClient:
-    """模型客户端 - 纯粹封装 Ollama 调用"""
+    """
+    模型客户端 - Facade 层
+
+    对外暴露统一接口，内部委托给具体的 Provider 实现。
+    消费方（ThinkEngine、EpisodicMemory 等）只需要和 ModelClient 交互，
+    不需要关心底层使用的是 Ollama、OpenAI 还是其他 API。
+    """
 
     def __init__(self, config: ModelConfig, event_bus: Optional["EventBus"] = None):
         self.config = config
         self._event_bus = event_bus
-        self._client = self._build_client()
-        logger.debug(f"ModelClient 初始化完成，模型: {config.name}, 使用代理: {config.use_proxy}")
-
-    def _build_client(self) -> OllamaAsyncClient:
-        """构建 Ollama 异步客户端"""
-        # 🆕 根据配置决定是否使用代理
-        if not self.config.use_proxy:
-            # 不使用代理：清除代理环境变量，确保 localhost 直连
-            os.environ.pop("HTTP_PROXY", None)
-            os.environ.pop("HTTPS_PROXY", None)
-            os.environ["NO_PROXY"] = "localhost,127.0.0.1,::1"
-            logger.debug("已禁用代理，localhost 将直连")
-        else:
-            # 使用代理：保留系统代理设置
-            logger.debug(f"使用代理模式，base_url: {self.config.base_url}")
-
-        return OllamaAsyncClient(host=self.config.base_url)
+        self._provider: BaseProvider = ProviderFactory.create(config)
+        logger.debug(
+            f"ModelClient 初始化完成，Provider: {config.provider}, 模型: {config.name}"
+        )
 
     def _build_options(self) -> dict:
         """构建模型选项"""
@@ -68,6 +50,7 @@ class ModelClient:
                     source="model_client",
                     data={
                         "model": self.config.name,
+                        "provider": self.config.provider,
                         "error": error_str,
                         "error_type": type(error).__name__,
                         "status_code": status_code,
@@ -80,25 +63,43 @@ class ModelClient:
         self,
         messages: list[dict[str, str]],
         tools: Optional[list[dict]] = None,
-    ) -> ChatResponse:
-        """非流式调用模型"""
-        kwargs = {
-            "model": self.config.name,
-            "messages": messages,
-            "tools": tools,
-            "options": self._build_options(),
-        }
+        model: Optional[str] = None,
+        options: Optional[dict] = None,
+        **kwargs,
+    ) -> UnifiedResponse:
+        """
+        非流式调用模型
 
-        # 🆕 qwen 模型不支持 think 参数，只有 deepseek-r1 等支持
+        Args:
+            messages: 消息列表
+            tools: 工具定义列表（可选）
+            model: 模型名称（可选，默认使用配置中的模型）
+            options: 模型选项（可选，默认使用配置构建）
+            **kwargs: 额外参数（如 think 等）
+
+        Returns:
+            UnifiedResponse: 统一响应
+
+        Raises:
+            ModelError: 调用失败或超时
+        """
+        call_model = model or self.config.name
+        call_options = options or self._build_options()
+
+        # 传递 think 参数
         if hasattr(self.config, "think") and self.config.think:
-            # 检查模型是否支持 think（简单判断）
-            if "deepseek" in self.config.name.lower() or "r1" in self.config.name.lower():
-                kwargs["think"] = self.config.think
+            kwargs.setdefault("think", True)
 
         try:
             logger.debug(f"非流式调用模型，消息数: {len(messages)}")
             response = await asyncio.wait_for(
-                self._client.chat(**kwargs, stream=False),
+                self._provider.chat(
+                    model=call_model,
+                    messages=messages,
+                    tools=tools,
+                    options=call_options,
+                    **kwargs,
+                ),
                 timeout=self.config.timeout,
             )
             logger.debug(f"模型响应完成，长度: {len(response.message.content or '')}")
@@ -132,34 +133,43 @@ class ModelClient:
         self,
         messages: list[dict[str, str]],
         tools: Optional[list[dict]] = None,
+        model: Optional[str] = None,
+        options: Optional[dict] = None,
+        **kwargs,
     ) -> AsyncIterator[StreamChunk]:
-        """流式调用模型"""
-        kwargs = {
-            "model": self.config.name,
-            "messages": messages,
-            "tools": tools,
-            "options": self._build_options(),
-        }
+        """
+        流式调用模型
 
-        # 🆕 qwen 模型不支持 think 参数
+        Args:
+            messages: 消息列表
+            tools: 工具定义列表（可选）
+            model: 模型名称（可选，默认使用配置中的模型）
+            options: 模型选项（可选，默认使用配置构建）
+            **kwargs: 额外参数
+
+        Yields:
+            StreamChunk: 流式响应块
+
+        Raises:
+            ModelError: 调用失败或超时
+        """
+        call_model = model or self.config.name
+        call_options = options or self._build_options()
+
+        # 传递 think 参数
         if hasattr(self.config, "think") and self.config.think:
-            if "deepseek" in self.config.name.lower() or "r1" in self.config.name.lower():
-                kwargs["think"] = self.config.think
+            kwargs.setdefault("think", True)
 
         try:
             logger.debug(f"流式调用模型，消息数: {len(messages)}")
-            stream = await self._client.chat(**kwargs, stream=True)
-
-            async for chunk in stream:
-                message = chunk.message
-
-                if message.tool_calls:
-                    yield StreamChunk(
-                        is_tool_call=True,
-                        tool_info={"message": message},
-                    )
-                elif message.content:
-                    yield StreamChunk(content=message.content)
+            async for chunk in self._provider.chat_stream(
+                model=call_model,
+                messages=messages,
+                tools=tools,
+                options=call_options,
+                **kwargs,
+            ):
+                yield chunk
 
         except asyncio.TimeoutError:
             error_msg = f"流式调用超时 ({self.config.timeout}s)"
@@ -173,7 +183,6 @@ class ModelClient:
             error_msg = f"流式模型调用失败: {e}"
             logger.error(error_msg)
 
-            error_str = str(e)
             self._publish_error(
                 e if isinstance(e, ModelError) else ModelError(error_msg),
                 {
@@ -185,14 +194,27 @@ class ModelClient:
 
     def update_config(self, config: ModelConfig) -> None:
         """
-        更新配置（例如运行时切换模型）
+        更新配置（例如运行时切换模型或 Provider）
 
         Args:
             config: 新的模型配置
         """
+        old_provider = self.config.provider
         self.config = config
-        self._client = self._build_client()
-        logger.info(f"ModelClient 配置已更新，模型: {config.name}, 使用代理: {config.use_proxy}")
+
+        if config.provider != old_provider:
+            # Provider 类型变了，需要重建
+            self._provider = ProviderFactory.create(config)
+            logger.info(
+                f"ModelClient Provider 已切换: {old_provider} -> {config.provider}, "
+                f"模型: {config.name}"
+            )
+        else:
+            # 同一 Provider，只更新配置
+            self._provider.update_config(config)
+            logger.info(
+                f"ModelClient 配置已更新，Provider: {config.provider}, 模型: {config.name}"
+            )
 
     async def embeddings(
         self,
@@ -200,7 +222,7 @@ class ModelClient:
         model: Optional[str] = None,
         timeout: Optional[float] = None,
         **kwargs,
-    ) -> EmbeddingsResponse:
+    ) -> UnifiedEmbeddingResponse:
         """
         获取文本向量
 
@@ -208,10 +230,10 @@ class ModelClient:
             prompt: 要向量化的文本
             model: 模型名称（可选，默认使用配置中的模型）
             timeout: 超时时间（可选，默认使用配置中的超时）
-            **kwargs: 其他传递给 ollama embeddings 的参数
+            **kwargs: 其他传递给 Provider 的参数
 
         Returns:
-            EmbeddingsResponse: 包含 embedding 向量的响应
+            UnifiedEmbeddingResponse: 统一 embedding 响应
 
         Raises:
             ModelError: 调用失败或超时
@@ -219,7 +241,7 @@ class ModelClient:
         try:
             logger.debug(f"调用 embeddings 模型，文本长度: {len(prompt)}")
             response = await asyncio.wait_for(
-                self._client.embeddings(
+                self._provider.embeddings(
                     model=model or self.config.name,
                     prompt=prompt,
                     **kwargs,
@@ -232,6 +254,10 @@ class ModelClient:
         except asyncio.TimeoutError:
             logger.error(f"embeddings 调用超时 ({timeout or self.config.timeout}s)")
             raise ModelError(f"embeddings 调用超时 ({timeout or self.config.timeout}秒)")
+
+        except NotImplementedError as e:
+            logger.warning(f"当前 Provider 不支持 embeddings: {e}")
+            raise ModelError(f"当前 Provider ({self.config.provider}) 不支持 embeddings") from e
 
         except Exception as e:
             logger.error(f"embeddings 调用失败: {e}")
@@ -257,7 +283,7 @@ class ModelClient:
             向量列表
         """
         tasks = [self.embeddings(prompt, model, timeout, **kwargs) for prompt in prompts]
-        responses = await asyncio.gather(*tasks)
+        responses = await asyncio.gather(*tasks, return_exceptions=True)
 
         embeddings = []
         for resp in responses:
@@ -275,6 +301,11 @@ class ModelClient:
         return self.config.name
 
     @property
-    def client(self) -> OllamaAsyncClient:
-        """模型客户端实例"""
-        return self._client
+    def provider_name(self) -> str:
+        """获取当前使用的 Provider 名称"""
+        return self.config.provider
+
+    @property
+    def provider(self) -> BaseProvider:
+        """获取 Provider 实例（仅供高级用途）"""
+        return self._provider

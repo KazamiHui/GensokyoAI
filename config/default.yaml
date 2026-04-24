@@ -7,15 +7,58 @@ log_file: "logs/GENSOKYOAI.log"
 
 # 模型配置
 model:
+  provider: "ollama"    # LLM Provider: ollama / openai / gemini / claude
   name: "qwen3.5:9b"
-  base_url: null  # null 表示使用默认 http://127.0.0.1:11434
+  base_url: null        # null 表示使用默认地址（ollama: http://127.0.0.1:11434）
+  api_key: null         # API 密钥（OpenAI/Gemini/Claude 等需要，ollama 不需要）
   stream: true
   think: false
   temperature: 0.7
   top_p: 0.9
   max_tokens: 2048
   timeout: 60
-  use_proxy: false  # 🆕 默认不使用代理，localhost 直连
+  use_proxy: false      # 是否使用代理，默认不使用，localhost 直连
+
+# ===== Provider 配置示例 =====
+#
+# --- Ollama（本地）---
+# model:
+#   provider: "ollama"
+#   name: "qwen3.5:9b"
+#   base_url: null              # 默认 http://127.0.0.1:11434
+#
+# --- OpenAI ---
+# model:
+#   provider: "openai"
+#   name: "gpt-4o"
+#   api_key: "sk-..."
+#   base_url: null              # 默认 https://api.openai.com/v1
+#
+# --- OpenAI 兼容（Deepseek）---
+# model:
+#   provider: "openai"
+#   name: "deepseek-chat"
+#   api_key: "sk-..."
+#   base_url: "https://api.deepseek.com/v1"
+#
+# --- OpenAI 兼容（SiliconFlow）---
+# model:
+#   provider: "openai"
+#   name: "Qwen/Qwen2.5-72B-Instruct"
+#   api_key: "sk-..."
+#   base_url: "https://api.siliconflow.cn/v1"
+#
+# --- Claude ---
+# model:
+#   provider: "claude"
+#   name: "claude-sonnet-4-20250514"
+#   api_key: "sk-ant-..."
+#
+# --- Gemini ---
+# model:
+#   provider: "gemini"
+#   name: "gemini-2.0-flash"
+#   api_key: "AIza..."
 
 # 记忆配置
 memory:
@@ -29,7 +72,7 @@ memory:
   auto_memory_enabled: true
   auto_memory_model: qwen3.5:9b
   
-  # 🆕 话题生成配置
+  # 话题生成配置
   topic_generation:
     name_max_length: 10
     summary_max_length: 100

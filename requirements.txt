@@ -1,10 +1,15 @@
 # requirements.txt
-# ===== 第三方稳定库（API 长期稳定，无需版本限制）=====
-ollama           # 本地模型调用
+# ===== 核心依赖 =====
 msgspec          # 高性能序列化
 loguru           # 日志系统
 rich             # 终端美化
 pyyaml           # YAML 解析
 
-# ===== 自研高性能库（需要特定版本修复构建问题）=====
+# ===== 自研高性能库 =====
 ayafileio>=1.0.0  # 真异步文件 I/O
+
+# ===== LLM Provider（按需安装）=====
+ollama           # Ollama 本地模型（默认 Provider）
+# openai         # OpenAI / Deepseek / SiliconFlow 等兼容 API
+# anthropic      # Anthropic Claude
+# google-genai   # Google Gemini

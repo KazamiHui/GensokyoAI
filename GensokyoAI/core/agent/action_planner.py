@@ -117,10 +117,8 @@ class ActionPlanner:
 只输出 JSON。"""
 
         try:
-            response = await self.model_client.client.chat(
-                model=self.model_client.model_name,
+            response = await self.model_client.chat(
                 messages=[{"role": "system", "content": prompt}],
-                stream=False,
                 options={"temperature": 0.7, "num_predict": 200},
             )
 

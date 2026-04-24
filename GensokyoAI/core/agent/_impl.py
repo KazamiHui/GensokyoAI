@@ -5,9 +5,8 @@ from pathlib import Path
 import asyncio
 from contextvars import ContextVar
 
-from ollama import Message
-
-from .model_client import ModelClient, StreamChunk
+from .types import UnifiedMessage, StreamChunk
+from .model_client import ModelClient
 from .save_coordinator import SaveCoordinator
 from .message_builder import MessageBuilder
 from .response_handler import ResponseHandler
@@ -94,9 +93,9 @@ class Agent:
 
     def _init_memory_system(self) -> None:
         self._memory_base_path = self.config.session.save_path
-        self._ollama_client = ModelClient(self.config.model, event_bus=self.event_bus)
+        self._model_client = ModelClient(self.config.model, event_bus=self.event_bus)
         self.episodic_memory = EpisodicMemoryManager(
-            self.config.memory, self.character_name, None, self._ollama_client
+            self.config.memory, self.character_name, None, self._model_client
         )
         self._semantic_memory: Optional[SemanticMemoryManager] = None
 
@@ -168,7 +167,7 @@ class Agent:
             memory_path.mkdir(parents=True, exist_ok=True)
 
             self._semantic_memory = SemanticMemoryManager(
-                self.config.memory, self.character_name, memory_path, self._ollama_client
+                self.config.memory, self.character_name, memory_path, self._model_client
             )
             logger.debug(f"语义记忆已初始化: {memory_path}")
         return self._semantic_memory
@@ -216,7 +215,7 @@ class Agent:
                 working_memory=self.working_memory,
                 episodic_memory=self.episodic_memory,
                 tool_executor=self.tool_executor,
-                model_client=self._ollama_client,
+                model_client=self._model_client,
                 message_builder=self.message_builder,
                 save_coordinator=self.save_coordinator,
             )
@@ -230,7 +229,7 @@ class Agent:
 
     async def send(
         self, user_input: str, system_contexts: list[str] | None = None
-    ) -> Message | None:
+    ) -> UnifiedMessage | None:
         """发送消息（非流式）- 完全事件驱动"""
         if self.is_shutting_down:
             return None
@@ -250,10 +249,10 @@ class Agent:
         try:
             full_response = await asyncio.wait_for(response_future, timeout=60.0)
             if full_response:
-                return Message(role="assistant", content=full_response)
+                return UnifiedMessage(role="assistant", content=full_response)
         except asyncio.TimeoutError:
             logger.warning("等待响应超时")
-            return Message(role="assistant", content="「唔…我有点走神了…」")
+            return UnifiedMessage(role="assistant", content="「唔…我有点走神了…」")
 
         return None
 
@@ -335,7 +334,7 @@ class Agent:
         if self._think_engine is None and self.semantic_memory is not None:
             self._think_engine = ThinkEngine(
                 semantic_memory=self.semantic_memory,
-                model_client=self._ollama_client,
+                model_client=self._model_client,
                 event_bus=self.event_bus,
                 character_name=self.character_name,
                 config=self.config.think_engine,
@@ -347,7 +346,7 @@ class Agent:
         if self._action_planner is None:
             self._action_planner = ActionPlanner(
                 character_name=self.character_name,
-                model_client=self._ollama_client,
+                model_client=self._model_client,
                 working_memory=self.working_memory,
                 semantic_memory=self.semantic_memory,
                 event_bus=self.event_bus,
