@@ -2,21 +2,42 @@
 
 # GensokyoAI/core/agent/types.py
 
+import msgspec
+import msgspec.json
+from typing import Sequence
 from msgspec import Struct, field
 
 
 class ToolCallFunction(Struct):
-    """工具调用函数信息"""
-
+    """ 工具调用函数 """
     name: str = ""
     arguments: dict = field(default_factory=dict)
-
+    provider: str = "openai"
+    
+    def to_dict(self) -> dict:
+        return {
+            "name": self.name,
+            "arguments": (
+                msgspec.json.encode(self.arguments).decode() 
+                if self.provider in ("openai", "openai_responses") 
+                else self.arguments
+            )
+        }
 
 class ToolCall(Struct):
-    """工具调用"""
-
-    id: str = ""  # OpenAI tool call ID（如 call_abc123），用于关联 tool 结果消息
+    """ 工具调用 """
+    id: str = ""
+    type: str = "function"
+    provider: str = "openai"
     function: ToolCallFunction = field(default_factory=ToolCallFunction)
+    
+    def to_dict(self) -> dict:
+        self.function.provider = self.provider
+        return {
+            "id": self.id,
+            "type": self.type,
+            "function": self.function.to_dict()
+        }
 
 
 class UnifiedMessage(Struct):
@@ -49,7 +70,7 @@ class UnifiedEmbeddingResponse(Struct):
     统一 Embedding 响应类型 - 替代 ollama.EmbeddingsResponse
     """
 
-    embedding: list[float] = field(default_factory=list)
+    embedding: Sequence[float] = field(default_factory=list)
     model: str = ""
 
 

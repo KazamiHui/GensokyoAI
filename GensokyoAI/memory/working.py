@@ -12,10 +12,20 @@ class WorkingMemoryManager:
     def __init__(self, max_turns: int = 20):
         self._memory = WorkingMemory(max_turns=max_turns)
 
-    def add_message(self, role: str, content: str, **kwargs) -> None:
-        """添加消息"""
-        self._memory.add(role, content, **kwargs)
-
+    def add_message(self, role: str, content: str, tool_calls=None, tool_call_id=None):
+        msg: dict = {"role": role, "content": content}
+        
+        if tool_calls:
+            msg["tool_calls"] = [
+                tc.to_dict() if hasattr(tc, 'to_dict') else tc 
+                for tc in tool_calls
+            ]
+        
+        if tool_call_id:
+            msg["tool_call_id"] = tool_call_id
+        
+        self._memory.messages.append(msg)
+        
     def get_context(self) -> list[dict[str, Any]]:
         """获取当前上下文"""
         return self._memory.get_context()

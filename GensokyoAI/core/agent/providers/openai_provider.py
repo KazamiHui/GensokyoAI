@@ -100,7 +100,7 @@ class OpenAIProvider(BaseProvider):
 
         return self._convert_response(response)
 
-    async def chat_stream(
+    async def chat_stream( # type: ignore
         self,
         model: str,
         messages: list[dict],

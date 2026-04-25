@@ -92,9 +92,11 @@ class ActionPlanner:
             logger.debug(f"🤫 [ActionPlanner] {self.character_name} 决定不主动说话")
 
     async def _on_tool_completed(self, event: Event) -> None:
-        """工具执行完成 - 继续对话"""
-        action = ActionFactory.speak(reason=f"工具执行完成，整合结果")
-        self._publish_action(action, trigger_event=event)
+        """工具执行完成 - 不需要再触发 SPEAK"""
+        # 🔧 FIX: response_handler.process_stream 已经在工具调用后
+        # 自动进行了第二次流式调用并生成了最终回复，
+        # 这里不需要再发布 SPEAK 行动，否则会导致重复调用和空消息
+        pass  # 什么都不做
 
     # ==================== 决策核心 ====================
 

@@ -2,9 +2,10 @@
 
 # GensokyoAI/core/agent/response_handler.py
 
+import re
 from typing import AsyncIterator, TYPE_CHECKING
 
-from .types import UnifiedMessage, UnifiedResponse, StreamChunk
+from .types import UnifiedMessage, StreamChunk
 from ...utils.logger import logger
 from ...utils.helpers import safe_get
 from ...memory.types import MemoryRecord
@@ -18,6 +19,9 @@ if TYPE_CHECKING:
     from .message_builder import MessageBuilder
     from .save_coordinator import SaveCoordinator
 
+# 🆕 模型可能意外输出的 XML 标签残留（如 <get_current_time>, </think> 等）
+_XML_TAG_PATTERN = re.compile(r'</?[a-z_]+[^>]*>')
+
 
 class ResponseHandler:
     """
@@ -30,19 +34,15 @@ class ResponseHandler:
         self,
         config: "AppConfig",
         working_memory: "WorkingMemoryManager",
-        episodic_memory: "EpisodicMemoryManager",
         tool_executor: "ToolExecutor",
         model_client: "ModelClient",
         message_builder: "MessageBuilder",
-        save_coordinator: "SaveCoordinator",
     ):
         self._config = config
         self._working_memory = working_memory
-        self._episodic_memory = episodic_memory
         self._tool_executor = tool_executor
         self._model_client = model_client
         self._message_builder = message_builder
-        self._save_coordinator = save_coordinator
         self._shutting_down = False
 
     def set_shutting_down(self, value: bool) -> None:
@@ -62,15 +62,24 @@ class ResponseHandler:
             return await self._tool_executor.execute_batch(parsed)
         return None
 
-    async def _record_tool_results(self, results: list[dict]) -> None:
+    def _record_tool_results(
+        self, tool_calls_message: UnifiedMessage, results: list[dict]
+    ) -> None:
+        """将工具调用和结果写入工作记忆"""
+
+        # 写入 assistant 的 tool_call 消息
+        if tool_calls_message.tool_calls:
+            self._working_memory.add_message(
+                role="assistant",
+                content="",
+                tool_calls=tool_calls_message.tool_calls
+            )
+
+        # 写入 tool 结果
         for r in results:
-            await self._episodic_memory.add_message(
-                MemoryRecord(
-                    content=r["content"],
-                    role="tool",
-                    character_id=self.character_name,
-                    metadata={"tool_name": r.get("name", "")},
-                )
+            self._working_memory.add_message(
+                role="tool",
+                content=r["content"]
             )
 
     # ==================== 响应处理 ====================
@@ -88,7 +97,7 @@ class ResponseHandler:
             if chunk.is_tool_call and chunk.tool_info:
                 tool_calls_message = chunk.tool_info["message"]
             else:
-                yield chunk
+                yield self._clean_chunk(chunk)
 
         if self._shutting_down or not tool_calls_message:
             return
@@ -98,15 +107,15 @@ class ResponseHandler:
         if not tool_results:
             return
 
-        await self._safe_record_results(tool_results)
+        self._safe_record_results(tool_calls_message, tool_results)
         cont_messages = self._message_builder.build_continuation()
 
         # 第二次流式调用
         async for chunk in self._safe_stream(cont_messages, None, "第二次流式调用"):
             if self._shutting_down:
                 break
-            yield chunk
-            
+            yield self._clean_chunk(chunk)
+
     # ==================== 私有容错方法 ====================
 
     async def _safe_stream(
@@ -120,7 +129,6 @@ class ResponseHandler:
             logger.error(f"{context}失败: {e}")
             yield StreamChunk(content=f"\n[响应中断: {e}]\n")
 
-
     async def _safe_tool_calls(self, message: UnifiedMessage) -> list[dict] | None:
         """带容错的工具调用"""
         try:
@@ -129,10 +137,21 @@ class ResponseHandler:
             logger.error(f"工具调用处理失败: {e}")
             return None
 
-
-    async def _safe_record_results(self, results: list[dict]) -> None:
-        """带容错的结果记录"""
+    def _safe_record_results(
+        self, tool_calls_message: UnifiedMessage, results: list[dict]
+    ) -> None:
         try:
-            await self._record_tool_results(results)
+            self._record_tool_results(tool_calls_message, results)
         except Exception as e:
             logger.warning(f"记录工具结果失败: {e}")
+
+    # ==================== 内容清洗 ====================
+
+    @staticmethod
+    def _clean_chunk(chunk: StreamChunk) -> StreamChunk:
+        """清洗模型意外输出的 XML 标签残留，防止脏数据进入工作记忆"""
+        if chunk.content and _XML_TAG_PATTERN.search(chunk.content):
+            cleaned = _XML_TAG_PATTERN.sub('', chunk.content)
+            if cleaned.strip():
+                return StreamChunk(content=cleaned)
+        return chunk

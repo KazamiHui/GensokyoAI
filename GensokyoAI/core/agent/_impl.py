@@ -213,11 +213,9 @@ class Agent:
             self._response_handler = ResponseHandler(
                 config=self.config,
                 working_memory=self.working_memory,
-                episodic_memory=self.episodic_memory,
                 tool_executor=self.tool_executor,
                 model_client=self._model_client,
                 message_builder=self.message_builder,
-                save_coordinator=self.save_coordinator,
             )
         return self._response_handler
 
@@ -363,31 +361,42 @@ class Agent:
         logger.info("Agent 已启动")
 
     async def _on_generate_response(self, event: Event) -> None:
-        """处理生成响应事件"""
         user_input = event.data.get("user_input", "")
         system_contexts = event.data.get("system_contexts", [])
 
-        await self._ensure_background_manager()
-        messages = self.message_builder.build(user_input, system_contexts)
-        tools = self.tool_registry.get_schemas() if self.config.tool.enabled else None
-
         full_response = ""
-        async for chunk in self.response_handler.process_stream(messages, tools):
-            if self.is_shutting_down:
-                break
-            if chunk.content:
-                full_response += chunk.content
-                await self._action_executor.feed_chunk(chunk.content)  # type: ignore
+        try:
+            await self._ensure_background_manager()
+            messages = self.message_builder.build(user_input, system_contexts)
+            tools = self.tool_registry.get_schemas() if self.config.tool.enabled else None
 
-        self._action_executor.complete_response(full_response)  # type: ignore
+            async for chunk in self.response_handler.process_stream(messages, tools):
+                if self.is_shutting_down:
+                    break
+                if chunk.content:
+                    full_response += chunk.content
+                    await self._action_executor.feed_chunk(chunk.content) # type: ignore
 
-        if full_response:
-            # 发布 MESSAGE_SENT 事件（让其他监听器知道）
-            self.event_bus.publish(
-                Event(
-                    type=SystemEvent.MESSAGE_SENT, source="agent", data={"content": full_response}
+        except Exception as e:
+            logger.error(f"生成响应异常: {e}")
+            error_msg = f"\n[出了点问题]\n"
+            if not full_response:
+                full_response = error_msg
+                await self._action_executor.feed_chunk(error_msg) # type: ignore
+
+        finally:
+            # 🔑 无论如何都要把控制权还给用户
+            if self._action_executor:
+                self._action_executor.complete_response(full_response)
+
+            if full_response and "响应中断" not in full_response:
+                self.event_bus.publish(
+                    Event(
+                        type=SystemEvent.MESSAGE_SENT,
+                        source="agent", 
+                        data={"content": full_response},
+                    )
                 )
-            )
 
     async def _on_shutdown(self) -> None:
         self.event_bus.publish(Event(type=SystemEvent.AGENT_SHUTDOWN, source="agent"))
