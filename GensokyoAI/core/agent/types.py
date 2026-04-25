@@ -19,7 +19,7 @@ class ToolCallFunction(Struct):
             "name": self.name,
             "arguments": (
                 msgspec.json.encode(self.arguments).decode() 
-                if self.provider in ("openai", "openai_responses") 
+                if self.provider in ("openai", "openai_responses", "deepseek")
                 else self.arguments
             )
         }
@@ -50,6 +50,7 @@ class UnifiedMessage(Struct):
     role: str = "assistant"
     content: str = ""
     tool_calls: list[ToolCall] | None = None
+    reasoning_content: str | None = None
 
 
 class UnifiedResponse(Struct):
@@ -82,5 +83,6 @@ class StreamChunk(Struct):
     """
 
     content: str = ""
+    reasoning_content: str | None = None
     is_tool_call: bool = False
     tool_info: dict | None = None

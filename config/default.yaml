@@ -7,12 +7,14 @@ log_file: "logs/GENSOKYOAI.log"
 
 # 主聊天模型配置
 model:
-  provider: "ollama"    # LLM Provider: ollama / openai / openai_responses / gemini / claude
+  provider: "ollama"    # LLM Provider: ollama / openai / deepseek / openai_responses / gemini / claude
   name: "qwen3.5:9b"
-  base_url: null        # null 表示使用 Provider 默认地址（ollama: http://127.0.0.1:11434）
-  api_key: null         # API 密钥（OpenAI/Gemini/Claude 等需要，ollama 不需要）
+  base_url: null        # null 表示使用 Provider 默认地址（ollama: http://127.0.0.1:11434, deepseek: https://api.deepseek.com）
+  api_key: null         # API 密钥（OpenAI/Gemini/Claude/DeepSeek 等需要，ollama 不需要）
   stream: true
   think: false
+  thinking_enabled: null # DeepSeek 专用；null 表示使用 Provider 默认值（DeepSeek 默认 true）
+  reasoning_effort: null # DeepSeek 专用；null 表示默认 high，可选 high / max
   temperature: 0.7
   top_p: 0.9
   max_tokens: 2048
@@ -53,7 +55,16 @@ embedding:
 #   api_key: "sk-..."
 #   base_url: null              # 默认 https://api.openai.com/v1
 #
-# --- OpenAI 兼容（Deepseek）---
+# --- DeepSeek（推荐使用独立 Provider，支持 thinking/reasoning_content 回传）---
+# model:
+#   provider: "deepseek"
+#   name: "deepseek-v4-pro"
+#   api_key: "sk-..."
+#   base_url: null              # 默认 https://api.deepseek.com
+#   thinking_enabled: true      # 默认 true
+#   reasoning_effort: "high"    # high / max，默认 high
+#
+# --- OpenAI 兼容（DeepSeek 旧配置，不推荐用于 thinking mode）---
 # model:
 #   provider: "openai"
 #   name: "deepseek-chat"

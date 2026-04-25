@@ -52,6 +52,14 @@ class ProviderFactory:
         except ImportError:
             pass
 
+        # DeepSeek - OpenAI 兼容但有独立 thinking/reasoning_content 语义
+        try:
+            from .deepseek_provider import DeepSeekProvider
+
+            cls._registry["deepseek"] = DeepSeekProvider
+        except ImportError:
+            pass
+
         # OpenAI Responses API - 尝试注册
         try:
             from .openai_responses_provider import OpenAIResponsesProvider

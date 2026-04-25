@@ -71,8 +71,9 @@ class ResponseHandler:
         if tool_calls_message.tool_calls:
             self._working_memory.add_message(
                 role="assistant",
-                content="",
-                tool_calls=tool_calls_message.tool_calls
+                content=tool_calls_message.content or "",
+                tool_calls=tool_calls_message.tool_calls,
+                reasoning_content=tool_calls_message.reasoning_content,
             )
 
         # 写入 tool 结果
@@ -93,18 +94,33 @@ class ResponseHandler:
     ) -> AsyncIterator[StreamChunk]:
         """处理流式响应"""
         tool_calls_message: UnifiedMessage | None = None
+        assistant_content = ""
+        assistant_reasoning = ""
 
         # 第一次流式调用
         async for chunk in self._safe_stream(messages, tools, "第一次流式调用"):
             if self._shutting_down:
                 break
+            if chunk.reasoning_content:
+                assistant_reasoning += chunk.reasoning_content
+                continue
             if chunk.is_tool_call and chunk.tool_info:
                 tool_calls_message = chunk.tool_info["message"]
+                if assistant_reasoning and not tool_calls_message.reasoning_content:
+                    tool_calls_message.reasoning_content = assistant_reasoning
             else:
-                yield self._clean_chunk(chunk)
+                cleaned = self._clean_chunk(chunk)
+                if cleaned.content:
+                    assistant_content += cleaned.content
+                yield cleaned
 
         if self._shutting_down or not tool_calls_message:
             return
+
+        if assistant_content and not tool_calls_message.content:
+            tool_calls_message.content = assistant_content
+        if assistant_reasoning and not tool_calls_message.reasoning_content:
+            tool_calls_message.reasoning_content = assistant_reasoning
 
         # 工具调用
         tool_results = await self._safe_tool_calls(tool_calls_message)
@@ -115,9 +131,11 @@ class ResponseHandler:
         cont_messages = self._message_builder.build_continuation()
 
         # 第二次流式调用
-        async for chunk in self._safe_stream(cont_messages, None, "第二次流式调用"):
+        async for chunk in self._safe_stream(cont_messages, tools, "第二次流式调用"):
             if self._shutting_down:
                 break
+            if chunk.reasoning_content:
+                continue
             yield self._clean_chunk(chunk)
 
     # ==================== 私有容错方法 ====================

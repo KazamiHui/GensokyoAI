@@ -22,12 +22,14 @@ class LogLevel(Enum):
 class ModelConfig(Struct):
     """模型配置"""
 
-    provider: str = "ollama"  # LLM Provider: ollama / openai / gemini / claude
+    provider: str = "ollama"  # LLM Provider: ollama / openai / deepseek / gemini / claude
     name: str = "qwen3.5:9b"
     base_url: str | None = None
     api_key: str | None = None  # API 密钥（OpenAI/Gemini/Claude 等需要）
     stream: bool = True
     think: bool = False
+    thinking_enabled: bool | None = None
+    reasoning_effort: str | None = None
     temperature: float = 0.7
     top_p: float = 0.9
     max_tokens: int = 2048
@@ -248,6 +250,12 @@ class ConfigLoader:
             api_key=override.api_key or base.api_key,
             stream=override.stream,
             think=override.think,
+            thinking_enabled=(
+                override.thinking_enabled
+                if override.thinking_enabled is not None
+                else base.thinking_enabled
+            ),
+            reasoning_effort=override.reasoning_effort or base.reasoning_effort,
             temperature=override.temperature if override.temperature != 0.7 else base.temperature,
             top_p=override.top_p if override.top_p != 0.9 else base.top_p,
             max_tokens=override.max_tokens if override.max_tokens != 2048 else base.max_tokens,
@@ -366,6 +374,10 @@ class ConfigLoader:
             config.model.api_key = os.getenv("GENSOKYOAI_API_KEY")  # type: ignore
         if os.getenv("GENSOKYOAI_BASE_URL"):
             config.model.base_url = os.getenv("GENSOKYOAI_BASE_URL")  # type: ignore
+        if os.getenv("GENSOKYOAI_THINKING_ENABLED"):
+            config.model.thinking_enabled = os.getenv("GENSOKYOAI_THINKING_ENABLED").lower() == "true"  # type: ignore
+        if os.getenv("GENSOKYOAI_REASONING_EFFORT"):
+            config.model.reasoning_effort = os.getenv("GENSOKYOAI_REASONING_EFFORT")  # type: ignore
         if os.getenv("GENSOKYOAI_EMBEDDING_PROVIDER"):
             config.embedding.provider = os.getenv("GENSOKYOAI_EMBEDDING_PROVIDER")  # type: ignore
         if os.getenv("GENSOKYOAI_EMBEDDING_MODEL"):

@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Code Style](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-> 一个专为角色扮演设计的异步 AI 对话框架，支持 Ollama / OpenAI / OpenAI Responses / Claude / Gemini 等多种 LLM Provider，提供三层记忆系统、会话管理、工具调用和可扩展后端。
+> 一个专为角色扮演设计的异步 AI 对话框架，支持 Ollama / OpenAI / DeepSeek / OpenAI Responses / Claude / Gemini 等多种 LLM Provider，提供三层记忆系统、会话管理、工具调用和可扩展后端。
 
 ## 🐧 QQ 群：675608356
 
@@ -37,7 +37,7 @@ GensokyoAI 不是简单的问答机器人，而是围绕“角色扮演”设计
 
 ### 🔌 可选择不同模型服务
 
-你可以按需求选择本地模型、OpenAI 兼容服务、Claude 或 Gemini。想要本地免费运行、接入云端大模型，或混合使用不同服务，都可以通过配置完成。
+你可以按需求选择本地模型、OpenAI 兼容服务、DeepSeek、Claude 或 Gemini。想要本地免费运行、接入云端大模型，或混合使用不同服务，都可以通过配置完成。
 
 ## 🌐 全局介绍
 
@@ -107,7 +107,7 @@ GensokyoAI 不是简单的问答机器人，而是围绕“角色扮演”设计
 - `remember` / `recall`：自主记忆管理。
 - `update_memory`：更新已有记忆。
 
-工具调用已统一适配多 Provider：OpenAI / OpenAI Responses / Ollama / Claude / Gemini 会转换为各自官方要求的工具调用格式。Claude 使用官方 Messages API 的 `tool_use` / `tool_result` content block，不使用 OpenAI 风格的 `role: tool`。
+工具调用已统一适配多 Provider：OpenAI / DeepSeek / OpenAI Responses / Ollama / Claude / Gemini 会转换为各自官方要求的工具调用格式。DeepSeek 使用独立 Provider 处理 thinking mode 下工具调用所需的 `reasoning_content` 回传；Claude 使用官方 Messages API 的 `tool_use` / `tool_result` content block，不使用 OpenAI 风格的 `role: tool`。
 
 ### 🎛️ 智能命令系统
 
@@ -124,7 +124,8 @@ GensokyoAI 不是简单的问答机器人，而是围绕“角色扮演”设计
 | Provider | 对话 | 工具调用 | Embeddings | 说明 |
 |----------|------|----------|------------|------|
 | **Ollama** | ✅ | ✅ | ✅ | 本地模型，默认 Provider |
-| **OpenAI** | ✅ | ✅ | ✅ | Chat Completions API，兼容 Deepseek / SiliconFlow / vLLM / Groq 等第三方服务 |
+| **OpenAI** | ✅ | ✅ | ✅ | Chat Completions API，兼容 SiliconFlow / vLLM / Groq 等第三方服务 |
+| **DeepSeek** | ✅ | ✅ | ❌ | DeepSeek 官方 OpenAI 兼容 API，支持 thinking mode 与 `reasoning_content` 回传 |
 | **OpenAI Responses** | ✅ | ✅ | ✅ | OpenAI 官方 Responses API |
 | **Claude** | ✅ | ✅ | ❌ | Anthropic Claude 系列；官方不提供自家 embedding 模型 |
 | **Gemini** | ✅ | ✅ 基础 | ✅ | Google Gemini 系列；工具结果当前以文本形式回传 |
@@ -152,7 +153,7 @@ GensokyoAI 不是简单的问答机器人，而是围绕“角色扮演”设计
 - Python 3.10+
 - 以下任选一种 LLM 后端：
   - [Ollama](https://ollama.ai/) 本地运行（默认，免费）
-  - OpenAI API Key，或 Deepseek / SiliconFlow 等 OpenAI 兼容服务
+  - OpenAI API Key，或 DeepSeek / SiliconFlow 等云端服务
   - Anthropic Claude API Key
   - Google Gemini API Key
 
@@ -168,13 +169,13 @@ cd GensokyoAI
 uv sync --extra ollama
 
 # 或安装其他 Provider
-uv sync --extra openai      # OpenAI / Deepseek / SiliconFlow 等
+uv sync --extra openai      # OpenAI / DeepSeek / SiliconFlow 等 OpenAI SDK 兼容服务
 uv sync --extra claude      # Anthropic Claude
 uv sync --extra gemini      # Google Gemini
 uv sync --extra all         # 全部 Provider
 ```
 
-**方式二：使用 pip**
+**方式二：使用 pip（普通用户不推荐）**
 
 ```bash
 git clone https://github.com/Patchouli-CN/GensokyoAI.git
@@ -186,7 +187,7 @@ pip install -r requirements.txt
 
 ```bash
 pip install ollama          # Ollama（默认）
-pip install openai          # OpenAI / Deepseek / SiliconFlow 等
+pip install openai          # OpenAI / DeepSeek / SiliconFlow 等 OpenAI SDK 兼容服务
 pip install anthropic       # Anthropic Claude
 pip install google-genai    # Google Gemini
 ```
@@ -208,14 +209,28 @@ model:
   base_url: "http://localhost:11434"
 ```
 
-**OpenAI / Deepseek 等 Chat Completions 兼容服务**
+**OpenAI Chat Completions 兼容服务**
 
 ```yaml
 model:
   provider: "openai"
-  name: "gpt-4o"                          # 或 deepseek-chat 等
+  name: "gpt-4o"
   api_key: "sk-..."
-  base_url: "https://api.deepseek.com/v1" # 可选，不填则使用 OpenAI 官方
+  base_url: null # 可选，不填则使用 OpenAI 官方；第三方兼容服务填写对应地址
+```
+
+**DeepSeek（推荐独立 Provider）**
+
+DeepSeek 虽然兼容 OpenAI SDK，但 thinking mode 下发生工具调用后，后续请求需要回传 `reasoning_content`。因此推荐使用独立的 `deepseek` Provider，而不是把 DeepSeek 配到通用 `openai` Provider 下。
+
+```yaml
+model:
+  provider: "deepseek"
+  name: "deepseek-v4-pro"
+  api_key: "sk-..."
+  base_url: null              # 默认 https://api.deepseek.com
+  thinking_enabled: true      # 默认 true；如需关闭 thinking mode 可设为 false
+  reasoning_effort: "high"    # high / max，默认 high
 ```
 
 **OpenAI Responses API**
@@ -339,10 +354,12 @@ Windows 用户可以直接双击 `run_default_uv.cmd` 或 `run_default_pip.cmd` 
 
 ```yaml
 model:
-  provider: "ollama"                 # ollama / openai / openai_responses / claude / gemini
+  provider: "ollama"                 # ollama / openai / deepseek / openai_responses / claude / gemini
   name: "qwen3.5:9b"                 # 主聊天模型名称
   base_url: "http://localhost:11434" # API 地址，部分 Provider 可为空
   api_key: "your-api-key"            # API Key，本地 Ollama 可为空
+  thinking_enabled: null             # DeepSeek 专用；null 表示使用 Provider 默认值
+  reasoning_effort: null             # DeepSeek 专用；null 表示默认 high，可选 high / max
   temperature: 0.7
   max_tokens: 4096
   timeout: 300
@@ -399,6 +416,8 @@ memory:
 | `GENSOKYOAI_MODEL` | 主模型名称 | `qwen3.5:9b` |
 | `GENSOKYOAI_API_KEY` | 主模型 API 密钥 | - |
 | `GENSOKYOAI_BASE_URL` | 主模型 API 地址 | - |
+| `GENSOKYOAI_THINKING_ENABLED` | DeepSeek thinking mode 开关 | Provider 默认值 |
+| `GENSOKYOAI_REASONING_EFFORT` | DeepSeek 推理强度 high / max | `high` |
 | `GENSOKYOAI_EMBEDDING_PROVIDER` | Embedding Provider | 默认复用主模型 Provider |
 | `GENSOKYOAI_EMBEDDING_MODEL` | Embedding 模型名称 | - |
 | `GENSOKYOAI_EMBEDDING_API_KEY` | Embedding API 密钥 | 默认复用主模型 API Key |
@@ -421,7 +440,7 @@ GensokyoAI/
 │   ├── commands/               # 命令系统
 │   ├── core/                   # 核心模块
 │   │   ├── agent/              # Agent、模型客户端、Provider、响应处理
-│   │   │   ├── providers/      # Ollama / OpenAI / OpenAI Responses / Claude / Gemini 等 Provider
+│   │   │   ├── providers/      # Ollama / OpenAI / DeepSeek / OpenAI Responses / Claude / Gemini 等 Provider
 │   │   │   ├── _impl.py        # Agent 主类
 │   │   │   ├── model_client.py # LLM 客户端 Facade
 │   │   │   └── types.py        # 统一响应、消息、工具调用类型
@@ -517,11 +536,11 @@ ProviderFactory.register("my_llm", MyProvider)
 ## 🧪 测试
 
 ```bash
-python -m unittest tests.test_claude_provider_conversion tests.test_model_client_embeddings
+python -m unittest tests.test_claude_provider_conversion tests.test_deepseek_provider tests.test_model_client_embeddings
 python -m compileall GensokyoAI tests
 ```
 
-当前测试覆盖 Claude 官方 `tool_use` / `tool_result` 格式转换、工具调用 ID 保留、extended thinking 预算约束，以及独立 embedding Provider / 模型路由。
+当前测试覆盖 Claude 官方 `tool_use` / `tool_result` 格式转换、工具调用 ID 保留、extended thinking 预算约束，DeepSeek thinking mode 参数、`reasoning_content` 与工具调用聚合，以及独立 embedding Provider / 模型路由。
 
 ## 🤝 贡献指南
 
@@ -535,7 +554,7 @@ python -m compileall GensokyoAI tests
 
 ## 📝 待办事项
 
-- [x] 多 LLM Provider 支持（Ollama / OpenAI / Claude / Gemini）
+- [x] 多 LLM Provider 支持（Ollama / OpenAI / DeepSeek / Claude / Gemini）
 - [ ] WebUI 后端（Gradio / FastAPI）
 - [ ] 多角色同时对话
 - [ ] 语音输入 / 输出

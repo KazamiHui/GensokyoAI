@@ -60,6 +60,7 @@ class ModelClient:
             base_url=embedding_config.base_url or self.config.base_url,
             api_key=embedding_config.api_key or self.config.api_key,
             timeout=embedding_config.timeout or self.config.timeout,
+            thinking_enabled=False,
             use_proxy=(
                 embedding_config.use_proxy
                 if embedding_config.use_proxy is not None

@@ -12,17 +12,32 @@ class WorkingMemoryManager:
     def __init__(self, max_turns: int = 20):
         self._memory = WorkingMemory(max_turns=max_turns)
 
-    def add_message(self, role: str, content: str, tool_calls=None, tool_call_id=None):
+    def add_message(
+        self,
+        role: str,
+        content: str,
+        tool_calls=None,
+        tool_call_id=None,
+        reasoning_content: str | None = None,
+        **extra,
+    ):
         msg: dict = {"role": role, "content": content}
+        
+        if reasoning_content:
+            msg["reasoning_content"] = reasoning_content
         
         if tool_calls:
             msg["tool_calls"] = [
-                tc.to_dict() if hasattr(tc, 'to_dict') else tc 
+                tc.to_dict() if hasattr(tc, 'to_dict') else tc
                 for tc in tool_calls
             ]
         
         if tool_call_id:
             msg["tool_call_id"] = tool_call_id
+        
+        for key, value in extra.items():
+            if value is not None:
+                msg[key] = value
         
         self._memory.messages.append(msg)
         
