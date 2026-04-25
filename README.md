@@ -4,37 +4,42 @@
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Code Style](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-> 一个专为角色扮演设计的异步 AI 对话框架，支持多种 LLM（Ollama / OpenAI / Claude / Gemini），提供完整的三层记忆系统、会话管理、工具调用和可扩展后端。让你与自己喜欢的角色进行深度、连贯的对话。
+> 一个专为角色扮演设计的异步 AI 对话框架，支持 Ollama / OpenAI / OpenAI Responses / Claude / Gemini 等多种 LLM Provider，提供三层记忆系统、会话管理、工具调用和可扩展后端。
 
-## 🐧 QQ群：675608356
-- **欢迎来提供功能建议、BUG反馈以及纯粹交流ᗜᴗᗜ！**
+## 🐧 QQ 群：675608356
+
+- **欢迎来提供功能建议、BUG 反馈以及纯粹交流ᗜᴗᗜ！**
 - **邀请链接** - https://qun.qq.com/universal-share/share?ac=1&authKey=2YjM%2FXyrxGTrkTDQMoxKM5QBzphCJzFxbXnKYDpF%2FVkmuNvH2%2BNaP2Z6l7d9LsB%2B&busi_data=eyJncm91cENvZGUiOiI2NzU2MDgzNTYiLCJ0b2tlbiI6IkROTnRsMVlMcWdPUzExZlp5T2RMbDI5eXBGRVNRcDV1blAxY2crWGhrUjdpaWVXSXoybE5CdFRSb3Q5Z3dCa0giLCJ1aW4iOiIyMjI2OTU2NTc5In0%3D&data=UBToZl_UF-gj5B9gKcj0YXcw7qCwC5DKmrw0Sh2-XNjTejEA31jAi1BONVOvh9v5PB98Y0f_Hz-MDvXiFrwnLA&svctype=4&tempid=h5_group_info
 
 ## ✨ 核心特性
 
 ### 🎭 为角色扮演而生
-- **YAML 角色配置** - 简单易懂的角色定义文件
-- **系统提示词模板** - 支持示例对话，快速塑造角色性格
-- **角色一致性维护** - 三层记忆系统确保角色不"出戏"
+
+- **YAML 角色配置**：用简单配置文件定义角色人设、问候语和示例对话。
+- **系统提示词模板**：支持长提示词和示例对话，快速塑造角色性格。
+- **角色一致性维护**：三层记忆系统帮助角色在长对话中保持上下文和性格一致。
 
 ### 🧠 三层记忆系统
+
 | 记忆类型 | 作用 | 实现方式 |
 |---------|------|---------|
 | **工作记忆** | 当前会话的完整对话 | 滑动窗口，保留最近 N 轮 |
 | **情景记忆** | 历史对话的压缩摘要 | 模型自动摘要，关键事件提取 |
-| **语义记忆** | 长期知识存储和检索 | 🆕 话题感知存储 + 遗忘曲线，无需向量数据库 |
+| **语义记忆** | 长期知识存储和检索 | 话题感知存储 + 遗忘曲线，默认不依赖向量数据库 |
 
-### 🧠 静默思考引擎 (ThinkEngine)
-让 AI 拥有自己的"心理时间"：
-- **定时触发思考** - AI 在空闲时主动回顾过往话题
-- **随机游走话题图谱** - 模拟人类的联想思维
-- **情感驱动优先** - 优先思考高情感值的话题
-- **自主决策是否说话** - 通过 ActionPlanner 判断是否主动发起对话
+### 🧠 静默思考引擎（ThinkEngine）
 
-> 💡 **设计哲学**：真正的角色不应该只是"回答问题"，而应该有自己的内心世界。ThinkEngine 让 AI 能够在静默时进行思考，并在恰当的时机主动开口。
+让 AI 拥有自己的“心理时间”：
 
-### 🎯 行动规划系统 (Action Planner)
-让 AI 自己决定"做什么"：
+- **定时触发思考**：AI 在空闲时主动回顾过往话题。
+- **随机游走话题图谱**：模拟人类联想式思维。
+- **情感驱动优先**：优先思考高情感值的话题。
+- **自主决策是否说话**：通过 ActionPlanner 判断是否主动发起对话。
+
+> 💡 **设计哲学**：真正的角色不应该只是“回答问题”，而应该有自己的内心世界。ThinkEngine 让 AI 能够在静默时思考，并在恰当的时机主动开口。
+
+### 🎯 行动规划系统（Action Planner）
+
 | 行动类型 | 说明 |
 |---------|------|
 | **SPEAK** | 回应用户消息 |
@@ -44,79 +49,63 @@
 | **RECALL** | 主动回忆 |
 | **WAIT** | 什么都不做 |
 
-### 🛠️ 自主记忆工具
-角色可以主动管理自己的记忆：
-- **`remember` 工具** - AI 自主判断何时记住重要信息
-- **`recall` 工具** - AI 需要时主动检索相关记忆
-- **话题感知存储** - 自动将记忆归类到话题，建立关联图谱
-- **遗忘曲线** - 基于重要性、情感效价和访问频率的智能遗忘机制
-
-> 💡 **设计哲学**：记忆管理完全交给 AI 自主决策，不做任何自动规则。因为最懂角色需要记住什么的，正是扮演它的 LLM 本身。
-
-### 💬 强大的会话管理
-- ✅ 创建、保存、恢复、列出会话
-- ✅ 自动持久化，基于 [ayafileio](https://github.com/Patchouli-CN/ayafileio) 的真异步 I/O
-- ✅ 会话回滚（说错话可以撤回）
-- ✅ 会话切换（和不同角色聊天无缝切换）
-
 ### 🔧 工具调用
-内置工具，让角色拥有"超能力"：
-- `get_current_time` - 获取当前时间
-- `get_current_dateinfo` - 获取日期和曜日（七曜日！）
-- `get_moon_phase` - 获取月相
-- `get_system_info` - 系统信息
-- `remember` / `recall` - 自主记忆管理
 
-> 💡 工具调用已统一适配多 Provider：OpenAI / OpenAI Responses / Ollama / Claude / Gemini 会转换为各自官方要求的工具调用格式。Claude 会使用官方 Messages API 的 `tool_use` / `tool_result` content block，不使用 OpenAI 风格的 `role: tool`。
+内置工具让角色拥有“超能力”：
+
+- `get_current_time`：获取当前时间。
+- `get_current_dateinfo`：获取日期和曜日（七曜日！）。
+- `get_moon_phase`：获取月相。
+- `get_system_info`：获取系统信息。
+- `remember` / `recall`：自主记忆管理。
+
+工具调用已统一适配多 Provider：OpenAI / OpenAI Responses / Ollama / Claude / Gemini 会转换为各自官方要求的工具调用格式。Claude 使用官方 Messages API 的 `tool_use` / `tool_result` content block，不使用 OpenAI 风格的 `role: tool`。
 
 ### 🎛️ 智能命令系统
+
 | 命令类型 | 示例 | 说明 |
 |---------|------|------|
 | **提示词标签** | `<know>内容</know>` | 动态注入参考资料 |
-| | `<meta>内容</meta>` | 设定场景/元数据 |
-| | `<attention>内容</attention>` | 提醒/纠正 AI |
+| | `<meta>内容</meta>` | 设定场景 / 元数据 |
+| | `<attention>内容</attention>` | 提醒或纠正 AI |
 | **系统命令** | `/help`, `/save`, `/new` | 控制程序行为 |
 | **聊天命令** | `<think>`, `<whisper>` | 本地显示，不发给 AI |
 
-### ⚡ 事件驱动架构
-- 全异步设计，基于 `asyncio`
-- **事件总线**解耦所有组件，易于扩展
-- 后台任务队列处理持久化
-- 流式输出支持，打字机效果
-- **优雅的信号处理和关闭流程**（Ctrl+C 安全退出，数据不丢失）
-
 ### 🔌 多 LLM Provider 支持
-通过可插拔的 Provider 架构，支持多种 LLM API：
+
 | Provider | 对话 | 工具调用 | Embeddings | 说明 |
 |----------|------|----------|------------|------|
-| **Ollama** | ✅ | ✅ | ✅ | 本地模型（默认） |
+| **Ollama** | ✅ | ✅ | ✅ | 本地模型，默认 Provider |
 | **OpenAI** | ✅ | ✅ | ✅ | Chat Completions API，兼容 Deepseek / SiliconFlow / vLLM / Groq 等第三方服务 |
-| **OpenAI Responses** | ✅ | ✅ | ✅ | OpenAI 官方 Responses API，推理性能更优 |
+| **OpenAI Responses** | ✅ | ✅ | ✅ | OpenAI 官方 Responses API |
 | **Claude** | ✅ | ✅ | ❌ | Anthropic Claude 系列；官方不提供自家 embedding 模型 |
 | **Gemini** | ✅ | ✅ | ✅ | Google Gemini 系列 |
 
-> 💡 支持自定义 Provider 注册，可以轻松扩展到任何 LLM API。
+> 💡 支持自定义 Provider 注册，可以扩展到其他 LLM API。
 
-### 🔌 可扩展后端
-- 抽象后端基类 `BaseBackend`
-- 内置 Rich 美化的控制台后端
-- 命令系统与后端解耦，易于扩展为 WebUI、QQ 机器人、Discord Bot 等
+### ⚡ 事件驱动架构与可扩展后端
+
+- 全异步设计，基于 `asyncio`。
+- 事件总线解耦 Agent、后端、工具、记忆和持久化组件。
+- 后台任务队列处理异步持久化。
+- 支持流式输出和打字机效果。
+- 内置 Rich 控制台后端，也可扩展为 WebUI、QQ 机器人、Discord Bot 等。
 
 ## 📦 快速开始
 
-### 环境要求
+### 1. 环境要求
+
 - Python 3.10+
 - 以下任选一种 LLM 后端：
   - [Ollama](https://ollama.ai/) 本地运行（默认，免费）
-  - OpenAI API Key（或 Deepseek / SiliconFlow 等兼容服务）
+  - OpenAI API Key，或 Deepseek / SiliconFlow 等 OpenAI 兼容服务
   - Anthropic Claude API Key
   - Google Gemini API Key
 
-### 安装
+### 2. 安装
 
 **方式一：使用 UV（推荐）**
 
-[UV](https://docs.astral.sh/uv/) 是一个极速的 Python 包管理器。
 ```bash
 git clone https://github.com/Patchouli-CN/GensokyoAI.git
 cd GensokyoAI
@@ -124,14 +113,15 @@ cd GensokyoAI
 # 基础安装 + Ollama（默认 Provider）
 uv sync --extra ollama
 
-# 或者安装其他 Provider
+# 或安装其他 Provider
 uv sync --extra openai      # OpenAI / Deepseek / SiliconFlow 等
-uv sync --extra claude       # Anthropic Claude
-uv sync --extra gemini       # Google Gemini
-uv sync --extra all          # 全部 Provider
+uv sync --extra claude      # Anthropic Claude
+uv sync --extra gemini      # Google Gemini
+uv sync --extra all         # 全部 Provider
 ```
 
 **方式二：使用 pip**
+
 ```bash
 git clone https://github.com/Patchouli-CN/GensokyoAI.git
 cd GensokyoAI
@@ -139,26 +129,33 @@ pip install -r requirements.txt
 ```
 
 **按需安装 LLM Provider（pip）**
+
 ```bash
-pip install ollama                 # Ollama（默认）
-pip install openai                 # OpenAI / Deepseek / SiliconFlow 等
-pip install anthropic              # Anthropic Claude
-pip install google-genai           # Google Gemini
+pip install ollama          # Ollama（默认）
+pip install openai          # OpenAI / Deepseek / SiliconFlow 等
+pip install anthropic       # Anthropic Claude
+pip install google-genai    # Google Gemini
 ```
 
-> 💡 **提示：** UV 用户通过 `--extra` 参数选择 Provider，pip 用户直接安装对应的 SDK 包即可。
+### 3. 配置主聊天模型
 
-### 配置 LLM Provider
+编辑 `config/default.yaml` 中的 `model` 配置。
 
-**使用 Ollama（默认）**
+**Ollama（默认）**
+
 ```bash
-# 下载模型
 ollama pull qwen3.5:9b
 ```
 
-**使用 OpenAI / Deepseek 等（Chat Completions API）**
+```yaml
+model:
+  provider: "ollama"
+  name: "qwen3.5:9b"
+  base_url: "http://localhost:11434"
+```
 
-编辑 `config/default.yaml`：
+**OpenAI / Deepseek 等 Chat Completions 兼容服务**
+
 ```yaml
 model:
   provider: "openai"
@@ -167,7 +164,7 @@ model:
   base_url: "https://api.deepseek.com/v1" # 可选，不填则使用 OpenAI 官方
 ```
 
-**使用 OpenAI Responses API（推荐用于 OpenAI 官方）**
+**OpenAI Responses API**
 
 ```yaml
 model:
@@ -176,30 +173,8 @@ model:
   api_key: "sk-..."
 ```
 
-> 💡 **OpenAI 双 API 支持**：`openai` Provider 使用 Chat Completions API，兼容所有 OpenAI 兼容的第三方服务；`openai_responses` Provider 使用 Responses API，仅限 OpenAI 官方，可获得更优的推理性能和更低的成本。
+**Claude**
 
-**配置独立 Embedding 模型**
-
-Embedding 模型现在与主聊天模型独立配置，避免把聊天模型误用于 embeddings。未配置 `embedding.name` 时，调用 embeddings 会明确报错。
-
-```yaml
-model:
-  provider: "openai"
-  name: "gpt-4o"
-  api_key: "sk-..."
-
-embedding:
-  provider: "openai"                 # 可省略，默认复用 model.provider
-  name: "text-embedding-3-small"     # 必填：不要填写聊天模型
-  api_key: "sk-..."                  # 可省略，默认复用 model.api_key
-  base_url: null                     # 可省略，默认复用 model.base_url
-  dimensions: 1024                   # 可选，仅部分模型支持，如 OpenAI text-embedding-3-*
-  encoding_format: "float"           # 可选：float / base64
-```
-
-如果主模型使用 Claude，也需要把 embedding 配到 OpenAI / Gemini / Ollama 或其他兼容 Provider，因为 Anthropic 官方不提供 Claude 自家的 embeddings；Claude 官方文档推荐按需选择 Voyage AI 等第三方 embedding 服务。
-
-**使用 Claude**
 ```yaml
 model:
   provider: "claude"
@@ -207,7 +182,8 @@ model:
   api_key: "sk-ant-..."
 ```
 
-**使用 Gemini**
+**Gemini**
+
 ```yaml
 model:
   provider: "gemini"
@@ -215,47 +191,61 @@ model:
   api_key: "AIza..."
 ```
 
-> 💡 **提示：** 也可以通过环境变量 `GENSOKYOAI_PROVIDER`、`GENSOKYOAI_API_KEY`、`GENSOKYOAI_BASE_URL` 覆盖主模型配置；embedding 有独立的环境变量，见下方“环境变量”。
+### 4. 配置 Embedding 模型（可选）
 
-### 创建角色（可选）
+Embedding 模型与主聊天模型独立配置。只有在你要调用 `ModelClient.embeddings()`、接入向量检索或外部向量存储时才需要配置。
 
-在 `characters/` 目录，或者任意你喜欢的地方创建角色文件，例如 `MorichikaRinnosuke.yaml`：
+```yaml
+embedding:
+  provider: "openai"                 # 可省略，默认复用 model.provider
+  name: "text-embedding-3-small"     # 必填：不要填写聊天模型
+  api_key: "sk-..."                  # 可省略，默认复用 model.api_key
+  base_url: null                     # 可省略，默认复用 model.base_url
+  dimensions: 1024                   # 可选，仅部分模型支持
+  encoding_format: "float"           # 可选：float / base64
+```
+
+> 💡 如果主聊天模型使用 Claude，也需要把 embedding 配到 OpenAI / Gemini / Ollama 或其他兼容 Provider。Anthropic 官方不提供 Claude 自家的 embeddings。
+
+### 5. 创建角色（可选）
+
+在 `characters/` 目录或任意你喜欢的位置创建角色文件，例如 `characters/example.yaml`：
 
 ```yaml
 name: "森近霖之助"
 system_prompt: |
-  你是森近霖之助，是香霖堂的店主...
-  
-greeting: "「~~~」"
+  你是森近霖之助，是香霖堂的店主……
+
+greeting: "「欢迎来到香霖堂。」"
 
 example_dialogue:
-  - user: "~~~？"
-    assistant: "「~~~」"
+  - user: "这个道具是什么？"
+    assistant: "「这可不是普通的外界道具。」"
 ```
 
-> 💡 **提示：** 创建角色是可选项，可以在 `characters/` 目录查看内置角色。
+也可以直接使用 `characters/zh_cn/` 目录中的内置角色。
 
-### 启动对话（以uv模式为例）
+### 6. 启动对话
 
 ```bash
 # 新建会话
-uv run main_v2.py --character characters/MorichikaRinnosuke.yaml --new-session
+uv run main_v2.py --character characters/zh_cn/KirisameMarisa.yaml --new-session
 
 # 恢复会话
-uv run main_v2.py --character characters/MorichikaRinnosuke.yaml --resume <session_id>
+uv run main_v2.py --character characters/zh_cn/KirisameMarisa.yaml --resume <session_id>
 
 # 列出所有会话
 uv run main_v2.py --list-sessions
 ```
 
-> 💡 **提示：** Windows 用户可以直接双击 `run_default_uv.cmd` 快速启动默认角色（雾雨魔理沙）。
+Windows 用户可以直接双击 `run_default_uv.cmd` 或 `run_default_pip.cmd` 快速启动默认角色。
 
 ## 🎮 命令行参数
 
 | 参数 | 简写 | 说明 |
 |------|------|------|
 | `--character` | `-c` | 角色配置文件路径 |
-| `--config` | - | 应用配置文件路径（默认 `config/default.yaml`） |
+| `--config` | - | 应用配置文件路径，默认 `config/default.yaml` |
 | `--new-session` | - | 创建新会话 |
 | `--resume` | - | 恢复指定 ID 的会话 |
 | `--list-sessions` | - | 列出所有历史会话 |
@@ -264,154 +254,49 @@ uv run main_v2.py --list-sessions
 ## 🎨 对话中的命令
 
 ### 提示词标签（会传递给 AI）
-- `<know>幻想乡位于日本...</know>`：动态注入参考资料
-- `<meta>当前场景：博丽神社...</meta>`：设定场景/元数据
-- `<attention>记住，你现在很困...</attention>`：提醒/纠正 AI 行为
+
+- `<know>幻想乡位于日本...</know>`：动态注入参考资料。
+- `<meta>当前场景：博丽神社...</meta>`：设定场景 / 元数据。
+- `<attention>记住，你现在很困...</attention>`：提醒或纠正 AI 行为。
 
 ### 系统命令
-- `/help`：显示帮助
-- `/exit` 或 `/quit`：退出程序
-- `/save`：保存当前会话
-- `/new`：创建新会话
-- `/back`：回滚上一轮对话
-- `/sessions`：列出历史会话
-- `/stream on/off`：切换流式输出
-- `/clear`：清空提示词上下文
-- `/errors`：查看最近错误统计
+
+- `/help`：显示帮助。
+- `/exit` 或 `/quit`：退出程序。
+- `/save`：保存当前会话。
+- `/new`：创建新会话。
+- `/back`：回滚上一轮对话。
+- `/sessions`：列出历史会话。
+- `/stream on/off`：切换流式输出。
+- `/clear`：清空提示词上下文。
+- `/errors`：查看最近错误统计。
 
 ### 聊天命令（仅本地显示，不发送给 AI）
-- `<think>内心独白</think>`：表达角色内心想法
-- `<whisper>悄悄话</whisper>`：小声说话
-- `<ooc>出戏内容</ooc>`：戏外交流
-- `<describe>环境描写</describe>`：场景描述
-- `<action>角色动作</action>`：动作描写
 
-## 🏗️ 项目结构
-
-```
-GensokyoAI/
-├── GensokyoAI/                # 主包目录
-│   ├── backends/              # 后端抽象与实现
-│   │   ├── base.py            # 抽象基类 BaseBackend
-│   │   └── console/           # Rich 控制台后端
-│   │       ├── _impl.py       # ConsoleBackend 实现
-│   │       └── commands.py    # 内置命令处理器
-│   │
-│   ├── core/                  # 核心模块
-│   │   ├── agent/             # Agent 实现
-│   │   │   ├── _impl.py       # Agent 主类
-│   │   │   ├── lifecycle.py   # 生命周期管理（信号处理）
-│   │   │   ├── model_client.py # LLM 客户端（Facade，多 Provider）
-│   │   │   ├── types.py       # 🆕 统一类型系统（跨 Provider）
-│   │   │   ├── providers/     # 🆕 LLM Provider 插件目录
-│   │   │   │   ├── base.py    # Provider 抽象基类
-│   │   │   │   ├── ollama_provider.py  # Ollama 实现
-│   │   │   │   ├── openai_provider.py  # OpenAI Chat Completions 兼容实现
-│   │   │   │   ├── openai_responses_provider.py  # 🆕 OpenAI Responses API 实现
-│   │   │   │   ├── claude_provider.py  # Claude 实现
-│   │   │   │   └── gemini_provider.py  # Gemini 实现
-│   │   │   ├── message_builder.py # 消息构建器
-│   │   │   ├── response_handler.py # 响应处理器（工具调用）
-│   │   │   ├── save_coordinator.py # 保存协调器（去重）
-│   │   │   ├── think_engine.py # 静默思考引擎
-│   │   │   ├── action_planner.py # 行动规划器（决策大脑）
-│   │   │   ├── action_executor.py # 行动执行器
-│   │   │   └── actions.py     # 行动定义
-│   │   ├── config.py          # 配置管理（YAML + 环境变量）
-│   │   ├── events.py          # 事件总线（发布/订阅）
-│   │   ├── event_listeners.py # 核心事件监听器
-│   │   └── exceptions.py      # 自定义异常
-│   │
-│   ├── memory/                # 记忆系统
-│   │   ├── working.py         # 工作记忆（当前对话）
-│   │   ├── episodic.py        # 情景记忆（历史摘要）
-│   │   ├── semantic.py        # 语义记忆管理器
-│   │   ├── topic_store.py     # 🆕 话题感知存储（核心）
-│   │   └── types.py           # 记忆数据类型
-│   │
-│   ├── session/               # 会话管理
-│   │   ├── manager.py         # 会话管理器
-│   │   ├── persistence.py     # 异步持久化（基于 ayafileio）
-│   │   └── context.py         # 会话上下文
-│   │
-│   ├── commands/              # 命令系统（与后端解耦）
-│   │   ├── parser.py          # 命令解析器（标签/前缀）
-│   │   ├── executor.py        # 命令执行器
-│   │   ├── decorators.py      # @command 装饰器
-│   │   ├── context.py         # 命令上下文
-│   │   └── result.py          # 命令执行结果
-│   │
-│   ├── tools/                 # 工具调用系统
-│   │   ├── base.py            # @tool 装饰器
-│   │   ├── registry.py        # 工具注册中心
-│   │   ├── executor.py        # 工具执行器
-│   │   └── tool_builtin/      # 内置工具
-│   │       ├── time.py        # 时间/日期工具
-│   │       ├── moon.py        # 月相工具
-│   │       ├── system.py      # 系统信息工具
-│   │       └── memory_tool.py # 🆕 自主记忆工具
-│   │
-│   ├── background/            # 后台任务系统
-│   │   ├── manager.py         # 任务管理器（队列+工作器）
-│   │   ├── types.py           # 任务数据类型
-│   │   └── workers/           # 工作器实现
-│   │       ├── base.py        # 工作器基类
-│   │       └── persistence_worker.py # 持久化工作器
-│   │
-│   └── utils/                 # 工具函数
-│       ├── logging.py         # 日志配置
-│       ├── formatters.py      # 格式化工具
-│       ├── helpers.py         # 通用辅助函数
-│       └── exec_hook.py       # 异常堆栈美化
-│
-├── characters/                # 角色配置文件
-│   ├── example.yaml           # 角色模板
-│   ├── marisa.yaml            # 雾雨魔理沙
-│   └── yuyuko.yaml            # 西行寺幽幽子
-│
-├── config/                    # 应用配置
-│   └── default.yaml           # 默认配置
-│
-├── sessions/                  # 会话存储目录（自动生成）
-│   └── {角色名}/               # 按角色分类
-│       ├── {session_id}.json  # 会话数据
-│       └── memory/            # 记忆数据
-│           └── {session_id}/
-│               └── topics.json # 话题和记忆
-│
-├── main_v2.py                 # 入口文件
-├── pyproject.toml             # 项目配置（UV）
-├── requirements.txt           # 依赖列表
-└── README.md                  # 本文档
-```
+- `<think>内心独白</think>`：表达角色内心想法。
+- `<whisper>悄悄话</whisper>`：小声说话。
+- `<ooc>出戏内容</ooc>`：戏外交流。
+- `<describe>环境描写</describe>`：场景描述。
+- `<action>角色动作</action>`：动作描写。
 
 ## 🔧 配置说明
 
-### 思考引擎配置
-```yaml
-think_engine:
-  enabled: true                     # 是否启用静默思考
-  think_interval_minutes: 5         # 思考间隔（分钟）
-  random_walk_steps_min: 2          # 随机游走最少步数
-  random_walk_steps_max: 5          # 随机游走最多步数
-  emotional_trigger_threshold: 0.5  # 优先选择高情感话题的阈值
-  emotional_priority_probability: 0.7 # 优先选择高情感话题的概率
-  think_temperature: 0.7            # 思考时的温度
-  think_max_tokens: 200             # 思考最大 token 数
-```
+### 主模型配置
 
-### 记忆系统配置
 ```yaml
-memory:
-  working_max_turns: 20             # 工作记忆最大轮数
-  episodic_threshold: 50            # 触发情景记忆压缩的消息数
-  episodic_keep_recent: 10          # 压缩时保留最近消息数
-  semantic_enabled: true            # 是否启用语义记忆
-  semantic_top_k: 5                 # 检索时返回的话题数
-  semantic_similarity_threshold: 0.7 # 相关性阈值
+model:
+  provider: "ollama"                 # ollama / openai / openai_responses / claude / gemini
+  name: "qwen3.5:9b"                 # 主聊天模型名称
+  base_url: "http://localhost:11434" # API 地址，部分 Provider 可为空
+  api_key: "your-api-key"            # API Key，本地 Ollama 可为空
+  temperature: 0.7
+  max_tokens: 4096
+  timeout: 300
+  use_proxy: false
 ```
 
 ### Embedding 配置
+
 ```yaml
 embedding:
   provider: null        # null 表示默认复用 model.provider
@@ -424,7 +309,88 @@ embedding:
   use_proxy: null       # null 表示复用 model.use_proxy
 ```
 
-> 💡 当前语义记忆默认使用“话题感知存储 + LLM 打分/关键词”的轻量方案，不强制依赖向量数据库；`ModelClient.embeddings()` 提供统一 embedding 能力，供后续向量检索、推荐或外部存储集成使用。
+当前语义记忆默认使用“话题感知存储 + LLM 打分 / 关键词”的轻量方案，不强制依赖向量数据库；`ModelClient.embeddings()` 提供统一 embedding 能力，供后续向量检索、推荐或外部存储集成使用。
+
+### 思考引擎配置
+
+```yaml
+think_engine:
+  enabled: true                       # 是否启用静默思考
+  think_interval_minutes: 5           # 思考间隔（分钟）
+  random_walk_steps_min: 2            # 随机游走最少步数
+  random_walk_steps_max: 5            # 随机游走最多步数
+  emotional_trigger_threshold: 0.5    # 优先选择高情感话题的阈值
+  emotional_priority_probability: 0.7 # 优先选择高情感话题的概率
+  think_temperature: 0.7              # 思考时的温度
+  think_max_tokens: 200               # 思考最大 token 数
+```
+
+### 记忆系统配置
+
+```yaml
+memory:
+  working_max_turns: 20              # 工作记忆最大轮数
+  episodic_threshold: 50             # 触发情景记忆压缩的消息数
+  episodic_keep_recent: 10           # 压缩时保留最近消息数
+  semantic_enabled: true             # 是否启用语义记忆
+  semantic_top_k: 5                  # 检索时返回的话题数
+  semantic_similarity_threshold: 0.7 # 相关性阈值
+```
+
+### 环境变量
+
+| 变量名 | 说明 | 默认值 |
+|--------|------|--------|
+| `GENSOKYOAI_PROVIDER` | 主模型 Provider | `ollama` |
+| `GENSOKYOAI_MODEL` | 主模型名称 | `qwen3.5:9b` |
+| `GENSOKYOAI_API_KEY` | 主模型 API 密钥 | - |
+| `GENSOKYOAI_BASE_URL` | 主模型 API 地址 | - |
+| `GENSOKYOAI_EMBEDDING_PROVIDER` | Embedding Provider | 默认复用主模型 Provider |
+| `GENSOKYOAI_EMBEDDING_MODEL` | Embedding 模型名称 | - |
+| `GENSOKYOAI_EMBEDDING_API_KEY` | Embedding API 密钥 | 默认复用主模型 API Key |
+| `GENSOKYOAI_EMBEDDING_BASE_URL` | Embedding API 地址 | 默认复用主模型 API 地址 |
+| `GENSOKYOAI_EMBEDDING_DIMENSIONS` | Embedding 输出维度 | - |
+| `GENSOKYOAI_EMBEDDING_ENCODING_FORMAT` | Embedding 编码格式 | - |
+| `GENSOKYOAI_EMBEDDING_TIMEOUT` | Embedding 超时时间 | 默认复用主模型 timeout |
+| `GENSOKYOAI_EMBEDDING_USE_PROXY` | Embedding 是否使用代理 | 默认复用主模型 use_proxy |
+| `GENSOKYOAI_LOG_LEVEL` | 日志级别 | `INFO` |
+| `GENSOKYOAI_LOG_CONSOLE` | 控制台日志开关 | `true` |
+| `GENSOKYOAI_MEMORY_WORKING_TURNS` | 工作记忆最大轮数 | `20` |
+
+## 🏗️ 项目结构
+
+```text
+GensokyoAI/
+├── GensokyoAI/                 # 主包目录
+│   ├── backends/               # 后端抽象与实现
+│   ├── background/             # 后台任务系统
+│   ├── commands/               # 命令系统
+│   ├── core/                   # 核心模块
+│   │   ├── agent/              # Agent、模型客户端、Provider、响应处理
+│   │   │   ├── providers/      # Ollama / OpenAI / Claude / Gemini 等 Provider
+│   │   │   ├── _impl.py        # Agent 主类
+│   │   │   ├── model_client.py # LLM 客户端 Facade
+│   │   │   └── types.py        # 统一响应、消息、工具调用类型
+│   │   ├── config.py           # 配置管理（YAML + 环境变量）
+│   │   ├── events.py           # 事件总线
+│   │   └── exceptions.py       # 自定义异常
+│   ├── memory/                 # 工作记忆、情景记忆、语义记忆
+│   ├── session/                # 会话管理与持久化
+│   ├── tools/                  # 工具注册、工具执行、内置工具
+│   └── utils/                  # 工具函数
+├── characters/                 # 角色配置文件
+│   ├── example.yaml            # 角色模板
+│   └── zh_cn/                  # 中文内置角色
+├── config/
+│   └── default.yaml            # 默认配置
+├── tests/                      # 回归测试
+├── main_v2.py                  # 入口文件
+├── pyproject.toml              # 项目配置（UV）
+├── requirements.txt            # pip 依赖列表
+├── run_default_uv.cmd          # Windows UV 快速启动脚本
+├── run_default_pip.cmd         # Windows pip 快速启动脚本
+└── README.md
+```
 
 ## 🔧 高级用法
 
@@ -436,15 +402,8 @@ from GensokyoAI.core.agent import Agent
 from GensokyoAI.backends.console import ConsoleBackendBuilder
 
 async def main():
-    # 创建 Agent
-    agent = Agent(character_file="characters/yuyuko.yaml")
-    
-    # 构建控制台后端
-    backend = ConsoleBackendBuilder(agent)\
-        .with_stream_mode(True)\
-        .build()
-    
-    # 运行交互式对话
+    agent = Agent(character_file="characters/zh_cn/SaigyoujiYuyuko.yaml")
+    backend = ConsoleBackendBuilder(agent).with_stream_mode(True).build()
     await backend.run_interactive()
 
 asyncio.run(main())
@@ -470,13 +429,13 @@ class WebBackend(BaseBackend):
     async def start(self):
         # 启动 Web 服务器
         pass
-    
+
     async def send(self, message: str) -> str:
         return await self.agent.send(message)
-    
+
     async def stop(self):
         pass
-    
+
     def set_stream_handler(self, handler):
         self._stream_handler = handler
 ```
@@ -489,7 +448,6 @@ from GensokyoAI.core.agent.types import UnifiedResponse, UnifiedMessage, StreamC
 
 class MyProvider(BaseProvider):
     async def chat(self, model, messages, tools=None, options=None, **kwargs):
-        # 实现你的 LLM 调用逻辑
         return UnifiedResponse(
             message=UnifiedMessage(role="assistant", content="Hello!"),
             model=model,
@@ -502,35 +460,6 @@ class MyProvider(BaseProvider):
 ProviderFactory.register("my_llm", MyProvider)
 ```
 
-## 🌍 环境变量
-
-| 变量名 | 说明 | 默认值 |
-|--------|------|--------|
-| `GENSOKYOAI_PROVIDER` | LLM Provider | `ollama` |
-| `GENSOKYOAI_MODEL` | 覆盖模型名称 | `qwen3.5:9b` |
-| `GENSOKYOAI_API_KEY` | API 密钥 | - |
-| `GENSOKYOAI_BASE_URL` | 主模型 API 地址 | - |
-| `GENSOKYOAI_EMBEDDING_PROVIDER` | Embedding Provider | 默认复用主模型 Provider |
-| `GENSOKYOAI_EMBEDDING_MODEL` | Embedding 模型名称 | - |
-| `GENSOKYOAI_EMBEDDING_API_KEY` | Embedding API 密钥 | 默认复用主模型 API Key |
-| `GENSOKYOAI_EMBEDDING_BASE_URL` | Embedding API 地址 | 默认复用主模型 API 地址 |
-| `GENSOKYOAI_EMBEDDING_DIMENSIONS` | Embedding 输出维度 | - |
-| `GENSOKYOAI_EMBEDDING_ENCODING_FORMAT` | Embedding 编码格式 | - |
-| `GENSOKYOAI_EMBEDDING_TIMEOUT` | Embedding 超时时间 | 默认复用主模型 timeout |
-| `GENSOKYOAI_EMBEDDING_USE_PROXY` | Embedding 是否使用代理 | 默认复用主模型 use_proxy |
-| `GENSOKYOAI_LOG_LEVEL` | 日志级别 | `INFO` |
-| `GENSOKYOAI_LOG_CONSOLE` | 控制台日志开关 | `true` |
-| `GENSOKYOAI_MEMORY_WORKING_TURNS` | 工作记忆最大轮数 | `20` |
-
-## 🤝 贡献指南
-
-欢迎提交 Issue 和 Pull Request！
-
-如果你：
-- 写了新的角色配置文件，欢迎分享到 `characters/` 目录
-- 开发了新的后端（QQ、Discord、Telegram 等），欢迎 PR
-- 发现了 bug 或有功能建议，请提交 Issue
-
 ## 🧪 测试
 
 ```bash
@@ -540,17 +469,27 @@ python -m compileall GensokyoAI tests
 
 当前测试覆盖 Claude 官方 `tool_use` / `tool_result` 格式转换、工具调用 ID 保留、extended thinking 预算约束，以及独立 embedding Provider / 模型路由。
 
+## 🤝 贡献指南
+
+欢迎提交 Issue 和 Pull Request！
+
+如果你：
+
+- 写了新的角色配置文件，欢迎分享到 `characters/` 目录。
+- 开发了新的后端（QQ、Discord、Telegram 等），欢迎 PR。
+- 发现了 bug 或有功能建议，请提交 Issue。
+
 ## 📝 待办事项
 
-- [x] 多 LLM Provider 支持（Ollama/OpenAI/Claude/Gemini）
-- [ ] WebUI 后端（Gradio/FastAPI）
+- [x] 多 LLM Provider 支持（Ollama / OpenAI / Claude / Gemini）
+- [ ] WebUI 后端（Gradio / FastAPI）
 - [ ] 多角色同时对话
-- [ ] 语音输入/输出
+- [ ] 语音输入 / 输出
 - [ ] 更多内置工具
 
 ## 📄 许可证
 
-MIT License - 详见 [LICENSE](LICENSE) 文件
+MIT License - 详见 [LICENSE](LICENSE) 文件。
 
 ## 🙏 致谢
 
@@ -571,4 +510,4 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 
 **Made with ❤️ and 🍵 in Gensokyo**
 
-*"只有华丽并不是魔法，弹幕最重要的是火力DA⭐ZE！" —— 雾雨魔理沙*
+*“只有华丽并不是魔法，弹幕最重要的是火力 DA⭐ZE！” —— 雾雨魔理沙*
