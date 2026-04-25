@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from .save_coordinator import SaveCoordinator
 
 # 🆕 模型可能意外输出的 XML 标签残留（如 <get_current_time>, </think> 等）
-_XML_TAG_PATTERN = re.compile(r'</?[a-z_]+[^>]*>')
+_XML_TAG_PATTERN = re.compile(r"</?[a-z_]+[^>]*>")
 
 
 class ResponseHandler:
@@ -62,17 +62,13 @@ class ResponseHandler:
             return await self._tool_executor.execute_batch(parsed)
         return None
 
-    def _record_tool_results(
-        self, tool_calls_message: UnifiedMessage, results: list[dict]
-    ) -> None:
+    def _record_tool_results(self, tool_calls_message: UnifiedMessage, results: list[dict]) -> None:
         """将工具调用和结果写入工作记忆"""
 
         # 写入 assistant 的 tool_call 消息
         if tool_calls_message.tool_calls:
             self._working_memory.add_message(
-                role="assistant",
-                content="",
-                tool_calls=tool_calls_message.tool_calls
+                role="assistant", content="", tool_calls=tool_calls_message.tool_calls
             )
 
         # 写入 tool 结果
@@ -91,7 +87,6 @@ class ResponseHandler:
     async def process_stream(
         self, messages: list[dict[str, str]], tools: list[dict] | None
     ) -> AsyncIterator[StreamChunk]:
-        """处理流式响应"""
         tool_calls_message: UnifiedMessage | None = None
 
         # 第一次流式调用
@@ -114,8 +109,15 @@ class ResponseHandler:
         self._safe_record_results(tool_calls_message, tool_results)
         cont_messages = self._message_builder.build_continuation()
 
-        # 第二次流式调用
-        async for chunk in self._safe_stream(cont_messages, None, "第二次流式调用"):
+        # 🔧 第二次流式调用，根据全局配置决定是否禁用推理
+        extra_body = None
+        if not self._config.model.think:
+            # 如果全局配置禁用了推理，则显式告诉 V4 别开推理模式
+            extra_body = {"thinking": {"type": "disabled"}}
+
+        async for chunk in self._safe_stream(
+            cont_messages, None, "第二次流式调用", extra_body=extra_body
+        ):
             if self._shutting_down:
                 break
             yield self._clean_chunk(chunk)
@@ -123,11 +125,17 @@ class ResponseHandler:
     # ==================== 私有容错方法 ====================
 
     async def _safe_stream(
-        self, messages: list, tools: list | None, context: str
+        self,
+        messages: list,
+        tools: list | None,
+        context: str,
+        extra_body: dict | None = None,   # 新增参数
     ) -> AsyncIterator[StreamChunk]:
         """带容错的流式调用"""
         try:
-            async for chunk in self._model_client.chat_stream(messages, tools):
+            async for chunk in self._model_client.chat_stream(
+                messages, tools, extra_body=extra_body    # 传进去
+            ):
                 yield chunk
         except Exception as e:
             logger.error(f"{context}失败: {e}")
@@ -141,9 +149,7 @@ class ResponseHandler:
             logger.error(f"工具调用处理失败: {e}")
             return None
 
-    def _safe_record_results(
-        self, tool_calls_message: UnifiedMessage, results: list[dict]
-    ) -> None:
+    def _safe_record_results(self, tool_calls_message: UnifiedMessage, results: list[dict]) -> None:
         try:
             self._record_tool_results(tool_calls_message, results)
         except Exception as e:
@@ -155,7 +161,7 @@ class ResponseHandler:
     def _clean_chunk(chunk: StreamChunk) -> StreamChunk:
         """清洗模型意外输出的 XML 标签残留，防止脏数据进入工作记忆"""
         if chunk.content and _XML_TAG_PATTERN.search(chunk.content):
-            cleaned = _XML_TAG_PATTERN.sub('', chunk.content)
+            cleaned = _XML_TAG_PATTERN.sub("", chunk.content)
             if cleaned.strip():
                 return StreamChunk(content=cleaned)
         return chunk
