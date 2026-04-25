@@ -5,7 +5,8 @@
 
 # GensokyoAI/core/agent/providers/claude_provider.py
 
-from typing import AsyncIterator, TYPE_CHECKING
+import json
+from typing import Any, AsyncIterator, TYPE_CHECKING
 
 from .base import BaseProvider
 from ..types import (
@@ -63,12 +64,13 @@ class ClaudeProvider(BaseProvider):
     ) -> UnifiedResponse:
         """非流式调用 Claude API"""
         options = options or {}
-        system_prompt, claude_messages = self._separate_system_messages(messages)
+        system_prompt, claude_messages = self._convert_messages_to_claude(messages)
+        max_tokens = options.get("num_predict") or options.get("max_tokens", 2048)
 
         call_kwargs: dict = {
             "model": model,
             "messages": claude_messages,
-            "max_tokens": options.get("num_predict") or options.get("max_tokens", 2048),
+            "max_tokens": max_tokens,
             "temperature": options.get("temperature", 0.7),
             "top_p": options.get("top_p", 0.9),
         }
@@ -79,12 +81,17 @@ class ClaudeProvider(BaseProvider):
         if tools:
             call_kwargs["tools"] = self._convert_tools_to_claude(tools)
 
-        # Claude extended thinking 支持
+        # Claude extended thinking 支持。
+        # Anthropic 要求 thinking budget 小于 max_tokens；开启 thinking 时移除采样参数以避免模型族兼容问题。
         if kwargs.get("think"):
-            call_kwargs["thinking"] = {
-                "type": "enabled",
-                "budget_tokens": options.get("num_predict", 2048),
-            }
+            thinking_budget = self._get_thinking_budget(options, max_tokens)
+            if thinking_budget:
+                call_kwargs["thinking"] = {
+                    "type": "enabled",
+                    "budget_tokens": thinking_budget,
+                }
+                call_kwargs.pop("temperature", None)
+                call_kwargs.pop("top_p", None)
 
         response = await self._client.messages.create(**call_kwargs)
         return self._convert_response(response)
@@ -99,12 +106,13 @@ class ClaudeProvider(BaseProvider):
     ) -> AsyncIterator[StreamChunk]:
         """流式调用 Claude API"""
         options = options or {}
-        system_prompt, claude_messages = self._separate_system_messages(messages)
+        system_prompt, claude_messages = self._convert_messages_to_claude(messages)
+        max_tokens = options.get("num_predict") or options.get("max_tokens", 2048)
 
         call_kwargs: dict = {
             "model": model,
             "messages": claude_messages,
-            "max_tokens": options.get("num_predict") or options.get("max_tokens", 2048),
+            "max_tokens": max_tokens,
             "temperature": options.get("temperature", 0.7),
             "top_p": options.get("top_p", 0.9),
         }
@@ -115,17 +123,20 @@ class ClaudeProvider(BaseProvider):
         if tools:
             call_kwargs["tools"] = self._convert_tools_to_claude(tools)
 
-        # Claude extended thinking 支持
+        # Claude extended thinking 支持。
         if kwargs.get("think"):
-            call_kwargs["thinking"] = {
-                "type": "enabled",
-                "budget_tokens": options.get("num_predict", 2048),
-            }
+            thinking_budget = self._get_thinking_budget(options, max_tokens)
+            if thinking_budget:
+                call_kwargs["thinking"] = {
+                    "type": "enabled",
+                    "budget_tokens": thinking_budget,
+                }
+                call_kwargs.pop("temperature", None)
+                call_kwargs.pop("top_p", None)
 
-        # 工具调用累积
-        tool_name = ""
-        tool_input_json = ""
-        in_tool_use = False
+        # 工具调用 / thinking 累积；Claude 流式事件以 content block index 区分多个 block。
+        tool_blocks: dict[int, dict[str, Any]] = {}
+        thinking_parts: list[str] = []
 
         async with self._client.messages.stream(**call_kwargs) as stream:
             async for event in stream:
@@ -133,44 +144,61 @@ class ClaudeProvider(BaseProvider):
                 if hasattr(event, "type"):
                     if event.type == "content_block_start":
                         block = event.content_block
-                        if hasattr(block, "type") and block.type == "tool_use":
-                            in_tool_use = True
-                            tool_name = block.name
-                            tool_input_json = ""
+                        index = getattr(event, "index", 0)
+                        if getattr(block, "type", "") == "tool_use":
+                            tool_blocks[index] = {
+                                "id": getattr(block, "id", ""),
+                                "name": getattr(block, "name", ""),
+                                "input_json": "",
+                            }
 
                     elif event.type == "content_block_delta":
                         delta = event.delta
+                        index = getattr(event, "index", 0)
                         if hasattr(delta, "type"):
                             if delta.type == "text_delta":
                                 yield StreamChunk(content=delta.text)
-                            elif delta.type == "input_json_delta":
-                                tool_input_json += delta.partial_json
+                            elif delta.type == "thinking_delta":
+                                thinking_parts.append(getattr(delta, "thinking", ""))
+                            elif delta.type == "input_json_delta" and index in tool_blocks:
+                                tool_blocks[index]["input_json"] += getattr(delta, "partial_json", "")
 
-                    elif event.type == "content_block_stop" and in_tool_use:
-                        import json
+                    elif event.type == "message_stop" and tool_blocks:
+                        unified_tool_calls: list[ToolCall] = []
+                        for _index, tool_data in sorted(tool_blocks.items()):
+                            try:
+                                args = (
+                                    json.loads(tool_data["input_json"])
+                                    if tool_data["input_json"]
+                                    else {}
+                                )
+                            except json.JSONDecodeError:
+                                args = {}
 
-                        try:
-                            args = json.loads(tool_input_json) if tool_input_json else {}
-                        except json.JSONDecodeError:
-                            args = {}
+                            unified_tool_calls.append(
+                                ToolCall(
+                                    id=tool_data.get("id", ""),
+                                    provider="claude",
+                                    function=ToolCallFunction(
+                                        name=tool_data.get("name", ""),
+                                        arguments=args,
+                                        provider="claude",
+                                    ),
+                                )
+                            )
 
                         unified_msg = UnifiedMessage(
                             role="assistant",
                             content="",
-                            tool_calls=[
-                                ToolCall(
-                                    function=ToolCallFunction(
-                                        name=tool_name,
-                                        arguments=args,
-                                    )
-                                )
-                            ],
+                            tool_calls=unified_tool_calls,
                         )
                         yield StreamChunk(
                             is_tool_call=True,
-                            tool_info={"message": unified_msg},
+                            tool_info={
+                                "message": unified_msg,
+                                "thinking": "".join(thinking_parts) if thinking_parts else None,
+                            },
                         )
-                        in_tool_use = False
 
     async def embeddings(
         self,
@@ -190,23 +218,128 @@ class ClaudeProvider(BaseProvider):
     # ==================== 转换工具方法 ====================
 
     @staticmethod
-    def _separate_system_messages(messages: list[dict]) -> tuple[str, list[dict]]:
-        """
-        分离 system 消息
+    def _get_thinking_budget(options: dict, max_tokens: int) -> int | None:
+        """获取 Claude extended thinking 的 token 预算。"""
+        budget = options.get("thinking_budget_tokens") or options.get("thinking_budget")
+        if budget is not None:
+            budget = int(budget)
+            return budget if 0 < budget < max_tokens else None
 
-        Claude API 要求 system 消息单独传入，不能放在 messages 列表中。
+        # Anthropic thinking budget 必须小于 max_tokens；max_tokens 太低时不自动开启，避免 400。
+        if max_tokens <= 1024:
+            logger.warning("Claude extended thinking 已请求，但 max_tokens <= 1024，跳过 thinking 参数")
+            return None
+        return min(max_tokens - 1, max(1024, max_tokens // 2))
+
+    @classmethod
+    def _convert_messages_to_claude(cls, messages: list[dict]) -> tuple[str, list[dict]]:
         """
-        system_parts = []
-        other_messages = []
+        将项目内部 / OpenAI 风格 messages 转换为 Claude Messages API 格式。
+
+        Claude 要求：
+        - system 作为顶层 system 参数传入；
+        - assistant 工具调用必须是 assistant content 中的 tool_use block；
+        - 工具结果必须是紧随其后的 user content 中的 tool_result block；
+        - 不支持 OpenAI 的 role=tool。
+        """
+        system_parts: list[str] = []
+        claude_messages: list[dict] = []
+
+        pending_tool_results: list[dict] = []
+
+        def flush_tool_results() -> None:
+            if pending_tool_results:
+                # Claude 要求多个 tool_result block 在同一 user 消息中置于 content 数组最前面。
+                claude_messages.append({"role": "user", "content": pending_tool_results.copy()})
+                pending_tool_results.clear()
 
         for msg in messages:
-            if msg.get("role") == "system":
-                system_parts.append(msg.get("content", ""))
+            role = msg.get("role", "")
+            content = msg.get("content", "")
+
+            if role == "system":
+                if content:
+                    system_parts.append(str(content))
+                continue
+
+            if role == "tool":
+                pending_tool_results.append(cls._convert_tool_result_block(msg))
+                continue
+
+            flush_tool_results()
+
+            if role == "assistant":
+                claude_messages.append(cls._convert_assistant_message(msg))
+            elif role == "user":
+                claude_messages.append({"role": "user", "content": content})
             else:
-                other_messages.append(msg)
+                # Claude 只接受 user/assistant；未知角色降级为 user 文本。
+                claude_messages.append({"role": "user", "content": str(content)})
+
+        flush_tool_results()
 
         system_prompt = "\n\n".join(system_parts) if system_parts else ""
-        return system_prompt, other_messages
+        return system_prompt, claude_messages
+
+    @classmethod
+    def _convert_assistant_message(cls, msg: dict) -> dict:
+        """转换 assistant 消息，保留 tool_use blocks。"""
+        content = msg.get("content", "")
+        tool_calls = msg.get("tool_calls") or []
+
+        if not tool_calls:
+            return {"role": "assistant", "content": content}
+
+        blocks: list[dict] = []
+        if content:
+            blocks.append({"type": "text", "text": str(content)})
+
+        for tool_call in tool_calls:
+            tool_id, name, arguments = cls._extract_tool_call(tool_call)
+            blocks.append(
+                {
+                    "type": "tool_use",
+                    "id": tool_id,
+                    "name": name,
+                    "input": arguments,
+                }
+            )
+
+        return {"role": "assistant", "content": blocks}
+
+    @staticmethod
+    def _convert_tool_result_block(msg: dict) -> dict:
+        """将 OpenAI role=tool 消息转换为 Claude tool_result content block。"""
+        content = msg.get("content", "")
+        tool_result: dict = {
+            "type": "tool_result",
+            "tool_use_id": msg.get("tool_call_id", "") or msg.get("id", ""),
+        }
+        if content:
+            tool_result["content"] = str(content)
+        if msg.get("is_error") or str(content).startswith(("错误:", "调用出错啦:")):
+            tool_result["is_error"] = True
+        return tool_result
+
+    @staticmethod
+    def _extract_tool_call(tool_call) -> tuple[str, str, dict]:
+        """从 ToolCall 对象或 OpenAI 风格 dict 中提取 Claude tool_use 所需字段。"""
+        if isinstance(tool_call, dict):
+            function = tool_call.get("function", {}) or {}
+            args = function.get("arguments", {})
+            if isinstance(args, str):
+                try:
+                    args = json.loads(args) if args else {}
+                except json.JSONDecodeError:
+                    args = {}
+            return tool_call.get("id", ""), function.get("name", ""), args or {}
+
+        function = getattr(tool_call, "function", None)
+        return (
+            getattr(tool_call, "id", ""),
+            getattr(function, "name", "") if function else "",
+            getattr(function, "arguments", {}) if function else {},
+        )
 
     def _convert_response(self, response) -> UnifiedResponse:
         """将 Claude Message 转换为 UnifiedResponse"""
@@ -220,10 +353,13 @@ class ClaudeProvider(BaseProvider):
             elif block.type == "tool_use":
                 tool_calls.append(
                     ToolCall(
+                        id=getattr(block, "id", ""),
+                        provider="claude",
                         function=ToolCallFunction(
                             name=block.name,
                             arguments=block.input or {},
-                        )
+                            provider="claude",
+                        ),
                     )
                 )
             elif block.type == "thinking":

@@ -76,10 +76,14 @@ class ResponseHandler:
             )
 
         # 写入 tool 结果
-        for r in results:
+        for index, r in enumerate(results):
+            fallback_id = ""
+            if tool_calls_message.tool_calls and index < len(tool_calls_message.tool_calls):
+                fallback_id = tool_calls_message.tool_calls[index].id
             self._working_memory.add_message(
                 role="tool",
-                content=r["content"]
+                content=r["content"],
+                tool_call_id=r.get("tool_call_id") or fallback_id,
             )
 
     # ==================== 响应处理 ====================

@@ -37,6 +37,7 @@ class ToolExecutor:
         for tc in message.tool_calls:
             parsed.append(
                 {
+                    "id": tc.id,
                     "name": tc.function.name,
                     "arguments": tc.function.arguments,
                 }
@@ -54,8 +55,10 @@ class ToolExecutor:
             logger.error(error_msg)
             return {
                 "role": "tool",
+                "tool_call_id": tool_call.get("id", ""),
                 "name": str(name) if name else "unknown",
                 "content": f"错误: {error_msg}",
+                "is_error": True,
             }
 
         # 🆕 发布工具调用开始事件
@@ -69,8 +72,10 @@ class ToolExecutor:
             self._publish_tool_event("failed", name, arguments, error_msg)
             return {
                 "role": "tool",
+                "tool_call_id": tool_call.get("id", ""),
                 "name": name,
                 "content": f"调用出错啦: {error_msg}",
+                "is_error": True,
             }
 
         try:
@@ -93,6 +98,7 @@ class ToolExecutor:
 
             return {
                 "role": "tool",
+                "tool_call_id": tool_call.get("id", ""),
                 "name": name,
                 "content": result,
             }
@@ -103,8 +109,10 @@ class ToolExecutor:
             self._publish_tool_event("failed", name, arguments, error_msg)
             return {
                 "role": "tool",
+                "tool_call_id": tool_call.get("id", ""),
                 "name": name,
                 "content": f"错误: {error_msg}",
+                "is_error": True,
             }
 
     def _publish_tool_event(
@@ -161,16 +169,20 @@ class ToolExecutor:
             logger.error(error_msg)
             return {
                 "role": "tool",
+                "tool_call_id": tool_call.get("id", ""),
                 "name": str(name) if name else "unknown",
                 "content": f"错误: {error_msg}",
+                "is_error": True,
             }
 
         tool_def = self._registry.get(name)
         if not tool_def:
             return {
                 "role": "tool",
+                "tool_call_id": tool_call.get("id", ""),
                 "name": name,
                 "content": f"错误: 工具 '{name}' 未找到",
+                "is_error": True,
             }
 
         try:
@@ -179,12 +191,15 @@ class ToolExecutor:
                 result = json.dumps(result, ensure_ascii=False)
             return {
                 "role": "tool",
+                "tool_call_id": tool_call.get("id", ""),
                 "name": name,
                 "content": result,
             }
         except Exception as e:
             return {
                 "role": "tool",
+                "tool_call_id": tool_call.get("id", ""),
                 "name": name,
                 "content": f"错误: {e}",
+                "is_error": True,
             }
