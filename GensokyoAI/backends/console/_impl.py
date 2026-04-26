@@ -319,7 +319,8 @@ class ConsoleBackend(BaseBackend):
 
     async def _on_initiative_message(self, event: Event) -> None:
         """将主动消息放入队列"""
-        await self._initiative_queue.put(event.data.get("message", ""))
+        if self.agent.config.debug_silent_output:
+            await self._initiative_queue.put(event.data.get("message", ""))
 
     async def run_interactive(self) -> None:
         await self.start()
@@ -329,6 +330,8 @@ class ConsoleBackend(BaseBackend):
                 try:
                     # 非阻塞等待，超时后继续循环
                     msg = await asyncio.wait_for(self._initiative_queue.get(), timeout=0.5)
+                    if not self.agent.config.debug_silent_output:
+                        continue
                     self.console.print()
                     self.console.print(f"[dim]💭 角色想对你说：[/]")
                     self._print_assistant_message(msg)

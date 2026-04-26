@@ -5,6 +5,9 @@ log_level: DEBUG
 log_console: false
 log_file: "logs/GENSOKYOAI.log"
 
+# 静默调试输出：开启后才输出静默思考、内心决策、推理内容等默认隐藏信息
+debug_silent_output: false
+
 # 主聊天模型配置
 model:
   provider: "ollama"    # LLM Provider: ollama / openai / deepseek / openai_responses / gemini / claude

@@ -403,6 +403,22 @@ think_engine:
   think_max_tokens: 200               # 思考最大 token 数
 ```
 
+### 静默调试输出
+
+默认情况下，静默思考、主动说话决策理由、模型推理内容等内部信息会被隐藏，避免内心独白或推理内容污染正常对话与工作记忆。调试时可以开启统一开关：
+
+```yaml
+debug_silent_output: true
+```
+
+也可以通过环境变量开启：
+
+```bash
+GENSOKYOAI_DEBUG_SILENT_OUTPUT=true
+```
+
+开启后会显示 / 记录静默思考摘要、主动发言决策细节，并允许 `reasoning_content` 写入调试事件；普通使用建议保持 `false`。
+
 ### 记忆系统配置
 
 ```yaml
@@ -434,6 +450,7 @@ memory:
 | `GENSOKYOAI_EMBEDDING_TIMEOUT` | Embedding 超时时间 | 默认复用主模型 timeout |
 | `GENSOKYOAI_EMBEDDING_USE_PROXY` | Embedding 是否使用代理 | 默认复用主模型 use_proxy |
 | `GENSOKYOAI_LOG_LEVEL` | 日志级别 | `INFO` |
+| `GENSOKYOAI_DEBUG_SILENT_OUTPUT` | 是否输出静默思考、主动决策理由和推理内容等调试信息 | `false` |
 | `GENSOKYOAI_LOG_CONSOLE` | 控制台日志开关 | `true` |
 | `GENSOKYOAI_MEMORY_WORKING_TURNS` | 工作记忆最大轮数 | `20` |
 

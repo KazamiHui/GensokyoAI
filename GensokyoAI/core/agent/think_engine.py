@@ -39,12 +39,14 @@ class ThinkEngine:
         event_bus: EventBus,
         character_name: str,
         config: "ThinkEngineConfig",
+        debug_silent_output: bool = False,
     ):
         self.semantic_memory = semantic_memory
         self.model_client = model_client
         self.event_bus = event_bus
         self.character_name = character_name
         self.config = config
+        self.debug_silent_output = debug_silent_output
 
         self._running = False
         self._think_task: Optional[asyncio.Task] = None
@@ -162,7 +164,12 @@ class ThinkEngine:
 
             thought = response.message.content
             if thought:
-                logger.info(f"💭 [ThinkEngine] {self.character_name} 内心独白: {thought[:100]}...")
+                if self.debug_silent_output:
+                    logger.info(f"💭 [ThinkEngine] {self.character_name} 内心独白: {thought[:100]}...")
+                else:
+                    logger.debug(
+                        f"💭 [ThinkEngine] {self.character_name} 产生静默思考（调试输出关闭，内容已隐藏）"
+                    )
 
                 # 🆕 只发布思考事件，不判断意图，不生成消息
                 # 决策交给 ActionPlanner

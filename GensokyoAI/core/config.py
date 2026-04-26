@@ -127,6 +127,9 @@ class AppConfig(Struct):
     log_console: bool = True
     log_file: Path | None = None
 
+    # 调试配置：开启后才输出静默思考、内心决策、推理内容等默认隐藏信息
+    debug_silent_output: bool = False
+
     # 子配置
     model: ModelConfig = field(default_factory=ModelConfig)
     embedding: EmbeddingConfig = field(default_factory=EmbeddingConfig)
@@ -201,6 +204,8 @@ class ConfigLoader:
             config.log_console = data["log_console"]
         if "log_file" in data and data["log_file"]:
             config.log_file = Path(data["log_file"])
+        if "debug_silent_output" in data:
+            config.debug_silent_output = bool(data["debug_silent_output"])
 
         if "model" in data:
             config.model = ModelConfig(**data["model"])
@@ -228,6 +233,7 @@ class ConfigLoader:
         )
         result.log_console = override.log_console
         result.log_file = override.log_file or base.log_file
+        result.debug_silent_output = override.debug_silent_output or base.debug_silent_output
 
         # 其他配置 - override 优先
         result.model = self._merge_model(base.model, override.model)
@@ -400,6 +406,10 @@ class ConfigLoader:
             config.log_level = LogLevel(os.getenv("GENSOKYOAI_LOG_LEVEL"))
         if os.getenv("GENSOKYOAI_LOG_CONSOLE"):
             config.log_console = os.getenv("GENSOKYOAI_LOG_CONSOLE").lower() == "true"  # type: ignore
+        if os.getenv("GENSOKYOAI_DEBUG_SILENT_OUTPUT"):
+            config.debug_silent_output = (
+                os.getenv("GENSOKYOAI_DEBUG_SILENT_OUTPUT").lower() == "true"
+            )  # type: ignore
         if os.getenv("GENSOKYOAI_MEMORY_WORKING_TURNS"):
             config.memory.working_max_turns = int(
                 os.getenv("GENSOKYOAI_MEMORY_WORKING_TURNS")  # type: ignore

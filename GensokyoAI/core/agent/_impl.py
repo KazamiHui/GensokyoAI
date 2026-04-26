@@ -340,6 +340,7 @@ class Agent:
                 event_bus=self.event_bus,
                 character_name=self.character_name,
                 config=self.config.think_engine,
+                debug_silent_output=self.config.debug_silent_output,
             )
         if self._think_engine:
             await self._think_engine.start()
@@ -352,6 +353,7 @@ class Agent:
                 working_memory=self.working_memory,
                 semantic_memory=self.semantic_memory,
                 event_bus=self.event_bus,
+                debug_silent_output=self.config.debug_silent_output,
             )
         if self._action_executor is None:
             self._action_executor = ActionExecutor(self, self.event_bus)
@@ -395,8 +397,9 @@ class Agent:
 
             if full_response and "响应中断" not in full_response:
                 data = {"content": full_response}
-                if reasoning := self.response_handler.last_assistant_reasoning:
-                    data["reasoning_content"] = reasoning
+                if self.config.debug_silent_output:
+                    if reasoning := self.response_handler.last_assistant_reasoning:
+                        data["reasoning_content"] = reasoning
                 self.event_bus.publish(
                     Event(
                         type=SystemEvent.MESSAGE_SENT,

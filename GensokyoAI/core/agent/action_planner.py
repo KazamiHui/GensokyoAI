@@ -33,12 +33,14 @@ class ActionPlanner:
         working_memory: "WorkingMemoryManager",
         semantic_memory: "SemanticMemoryManager",
         event_bus: EventBus,
+        debug_silent_output: bool = False,
     ):
         self.character_name = character_name
         self.model_client = model_client
         self.working_memory = working_memory
         self.semantic_memory = semantic_memory
         self.event_bus = event_bus
+        self.debug_silent_output = debug_silent_output
 
         self.motivation_evaluator = MotivationEvaluator(self.character_name, self.model_client)
         self.conflict_detector = ConflictDetector()
@@ -124,10 +126,15 @@ class ActionPlanner:
         # 阶段3：策略选择
         if conflict.has_conflict and conflict.recommendation == "克制":
             # 明明想说但克制住了——记录这个"内心挣扎"
-            logger.info(
-                f"🌙 [ActionPlanner] {self.character_name} 想说但克制了 "
-                f"({conflict.conflict_type.name}, 驱动力: {motivation.total_drive:.2f})"
-            )
+            if self.debug_silent_output:
+                logger.info(
+                    f"🌙 [ActionPlanner] {self.character_name} 想说但克制了 "
+                    f"({conflict.conflict_type.name}, 驱动力: {motivation.total_drive:.2f})"
+                )
+            else:
+                logger.debug(
+                    f"🌙 [ActionPlanner] {self.character_name} 产生内心克制决策（调试输出关闭，内容已隐藏）"
+                )
             return ActionFactory.wait(
                 reason=f"内心有话说但{conflict.conflict_type.name}(强度{conflict.intensity:.2f})"
             )
@@ -192,10 +199,15 @@ class ActionPlanner:
                         )
                 else:
                     # 沉默也是一种行动——记录拒绝理由
-                    logger.info(
-                        f"🤫 [ActionPlanner] {self.character_name} 选择沉默: "
-                        f"{data.get('reason', '')} (驱动力:{motivation.total_drive:.2f})"
-                    )
+                    if self.debug_silent_output:
+                        logger.info(
+                            f"🤫 [ActionPlanner] {self.character_name} 选择沉默: "
+                            f"{data.get('reason', '')} (驱动力:{motivation.total_drive:.2f})"
+                        )
+                    else:
+                        logger.debug(
+                            f"🤫 [ActionPlanner] {self.character_name} 选择沉默（调试输出关闭，理由已隐藏）"
+                        )
         except Exception as e:
             logger.error(f"LLM 决策失败: {e}")
 
