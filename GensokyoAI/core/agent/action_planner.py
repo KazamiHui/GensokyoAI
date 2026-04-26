@@ -8,6 +8,7 @@ from typing import Optional, TYPE_CHECKING
 from .actions import Action, ActionType, ActionFactory
 from ..events import EventBus, Event, SystemEvent, EventPriority
 from ...utils.logger import logger
+from .message_builder import MessageBuilder
 from .motivation_evaluator import MotivationEvaluator
 from .conflict_detector import ConflictDetector
 
@@ -182,7 +183,13 @@ class ActionPlanner:
 
         try:
             messages = [{"role": "system", "content": prompt}]
-            messages.extend(self.working_memory.get_recent(6))
+            raw_content = self.working_memory.get_recent(6) # 这里固定3轮对话作为思考就好
+            cleaned = MessageBuilder.operate_on(raw_content) \
+            .exclude_role("tool") \
+            .exclude(role="assistant", has="tool_calls") \
+            .get()
+            
+            messages.extend(cleaned)
             response = await self.model_client.chat(
                 messages=messages,
                 options={"temperature": 0.7, "num_predict": 300},

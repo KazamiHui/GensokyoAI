@@ -10,7 +10,48 @@ if TYPE_CHECKING:
     from ...memory.working import WorkingMemoryManager
     from ...memory.episodic import EpisodicMemoryManager
     from ...memory.semantic import SemanticMemoryManager
+    
 
+class MessageOperation:
+    def __init__(self, messages: list[dict]):
+        self._messages = messages
+    
+    def exclude(self, **conditions) -> "MessageOperation":
+        """万能排除器"""
+        def matches(msg):
+            for key, value in conditions.items():
+                if key == "has":
+                    if value not in msg:
+                        return False
+                elif key == "has_not":
+                    if value in msg:
+                        return False
+                else:
+                    if msg.get(key) != value:
+                        return False
+            return True
+        
+        self._messages = [m for m in self._messages if not matches(m)]
+        return self
+
+    def filter(self, predicate) -> "MessageOperation":
+        self._messages = [m for m in self._messages if predicate(m)]
+        return self
+    
+    def filter_role(self, *roles: str) -> "MessageOperation":
+        self._messages = [m for m in self._messages if m.get("role") in roles]
+        return self
+    
+    def exclude_role(self, *roles: str) -> "MessageOperation":
+        self._messages = [m for m in self._messages if m.get("role") not in roles]
+        return self
+    
+    def take(self, n: int) -> "MessageOperation":
+        self._messages = self._messages[-n:]
+        return self
+    
+    def get(self) -> list[dict]:
+        return self._messages
 
 class MessageBuilder:
     """
@@ -140,3 +181,8 @@ class MessageBuilder:
             system_prompt: 新的系统提示词
         """
         self._system_prompt = system_prompt
+    
+    @staticmethod
+    def operate_on(messages: list[dict]) -> MessageOperation:
+        """创建一个消息操作链"""
+        return MessageOperation(messages)
