@@ -124,6 +124,8 @@ class MessageBuilder:
             消息列表
         """
         messages: list[dict[str, str]] = [{"role": "system", "content": self.system_prompt}]
+        # 保留工作记忆中的 provider 私有协议字段，例如 DeepSeek thinking mode
+        # 所需的 reasoning_content；展示层是否输出由 debug_silent_output 控制。
         messages.extend(self._working_memory.get_context())
         messages.append(
             {

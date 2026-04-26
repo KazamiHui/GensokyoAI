@@ -43,7 +43,12 @@ class WorkingMemoryManager:
         
     @staticmethod
     def _clean_reasoning(obj):
-        """递归删除 reasoning_content（迭代栈实现）"""
+        """递归删除 reasoning_content（迭代栈实现）。
+
+        注意：该方法只能用于不支持 reasoning_content 的 Provider 出站清洗，
+        不能用于 DeepSeek thinking mode 的工作记忆/上下文构建，否则会破坏
+        DeepSeek 多轮对话必须回传 reasoning_content 的协议要求。
+        """
         import copy
         cleaned = copy.deepcopy(obj)
         stack = [cleaned]

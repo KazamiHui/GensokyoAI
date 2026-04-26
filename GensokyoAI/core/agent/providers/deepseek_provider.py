@@ -71,16 +71,32 @@ class DeepSeekProvider(OpenAIProvider):
         else:
             call_kwargs["extra_body"] = {"thinking": {"type": "disabled"}}
 
-    @staticmethod
-    def _prepare_messages(messages: list[dict]) -> list[dict]:
+    def _prepare_messages(self, messages: list[dict]) -> list[dict]:
         """复制消息并保留 DeepSeek 支持的 reasoning_content 字段。"""
         prepared: list[dict] = []
-        for message in messages:
+        for index, message in enumerate(messages):
             copied = dict(message)
-            # DeepSeek 要求 tool 调用相关 assistant 消息完整回传 reasoning_content。
-            # 非 DeepSeek Provider 不会使用此类，因此不会影响其他 OpenAI-compatible 服务商。
+            # DeepSeek thinking mode 要求历史 assistant 推理消息完整回传 reasoning_content。
+            # 这里不补造推理内容，只做诊断；真正的保存发生在 Agent/WorkingMemory 链路。
+            if self._thinking_enabled:
+                self._warn_if_reasoning_missing(copied, index)
             prepared.append(copied)
         return prepared
+
+    @staticmethod
+    def _warn_if_reasoning_missing(message: dict, index: int) -> None:
+        """诊断 DeepSeek thinking mode 上下文中可能缺失的 reasoning_content。"""
+        if message.get("role") != "assistant":
+            return
+        if not message.get("content") and not message.get("tool_calls"):
+            return
+        if message.get("reasoning_content"):
+            return
+        logger.warning(
+            "DeepSeek thinking mode 上下文中发现 assistant 消息缺少 reasoning_content "
+            f"(index={index}, has_tool_calls={bool(message.get('tool_calls'))})；"
+            "这可能导致 API 返回 `reasoning_content must be passed back`。"
+        )
 
     @staticmethod
     def _make_tool_call(tc_data: dict) -> ToolCall:

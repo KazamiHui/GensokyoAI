@@ -397,9 +397,10 @@ class Agent:
 
             if full_response and "响应中断" not in full_response:
                 data = {"content": full_response}
-                if self.config.debug_silent_output:
-                    if reasoning := self.response_handler.last_assistant_reasoning:
-                        data["reasoning_content"] = reasoning
+                # reasoning_content 对 DeepSeek thinking mode 是多轮协议状态，
+                # 不是调试展示内容；是否显示仍由 UI/日志层的 debug_silent_output 控制。
+                if reasoning := self.response_handler.last_assistant_reasoning:
+                    data["reasoning_content"] = reasoning
                 self.event_bus.publish(
                     Event(
                         type=SystemEvent.MESSAGE_SENT,
