@@ -1,4 +1,4 @@
-"""控制台后端 - 集成 Rich 美化"""
+"""控制台后端 - 集成 Rich 美化，主动消息实时显示"""
 
 # GensokyoAI/backends/console/_impl.py
 
@@ -11,7 +11,7 @@ from rich.panel import Panel
 from rich.text import Text
 
 from ..base import BaseBackend
-from ...core.events import Event, SystemEvent
+from ...core.events import Event, SystemEvent, EventPriority
 from ...core.agent import Agent
 from ...utils.logger import logger
 from ...utils.formatters import format_session_id, format_datetime
@@ -28,7 +28,7 @@ ART = r"""
 
 
 class ConsoleBackend(BaseBackend):
-    """控制台后端 - 只负责 I/O，命令处理委托给 CommandExecutor"""
+    """控制台后端 - 主动消息实时显示，Prompt.ask 负责输入"""
 
     def __init__(self, agent: Agent):
         self.agent = agent
@@ -51,12 +51,22 @@ class ConsoleBackend(BaseBackend):
             "info": "cyan",
             "cmd": "bold cyan",
             "prompt": "bold magenta",
+            "initiative": "dim italic",
         }
 
+        # 主动消息队列 + 后台显示任务
         self._initiative_queue: asyncio.Queue[str] = asyncio.Queue()
+        self._display_task: asyncio.Task | None = None
 
-        # 角色有想法啦！
-        agent.event_bus.subscribe(SystemEvent.THINK_ENGINE_INITIATIVE, self._on_initiative_message)
+        # 是否有流式输出正在进行
+        self._streaming_in_progress = False
+
+        # 订阅主动消息事件
+        agent.event_bus.subscribe(
+            SystemEvent.THINK_ENGINE_INITIATIVE,
+            self._on_initiative_message,
+            priority=EventPriority.LOW,
+        )
 
         # 累积的提示词上下文
         self._prompt_context: list[str] = []
@@ -88,7 +98,6 @@ class ConsoleBackend(BaseBackend):
         """构建系统上下文列表（用于传递给 Agent）"""
         if not self._prompt_context:
             return []
-        # 返回最近 5 条上下文，每条作为一个独立的 system 消息
         return self._prompt_context[-5:]
 
     # ==================== 核心方法 ====================
@@ -108,21 +117,19 @@ class ConsoleBackend(BaseBackend):
         """显示欢迎面板"""
         character_name = safe_get(self.agent.config, "character.name", "Unknown")
 
-        # 构建艺术字 - 上半部分红色，下半部分白色
         art_text = Text()
         lines = ART.strip("\n").split("\n")
 
         for i, line in enumerate(lines):
-            if i < 3:  # 上半部分（Gens）
+            if i < 3:
                 art_text.append(line + "\n", style="bold red")
-            elif i < 5:  # 中间部分（kyo）
-                art_text.append(line + "\n", style="bold #FF6666")  # 浅红过渡
-            else:  # 下半部分（AI）
+            elif i < 5:
+                art_text.append(line + "\n", style="bold #FF6666")
+            else:
                 art_text.append(line + "\n", style="bold white")
 
         art_text.append(" ☯", style="bold yellow")
 
-        # 构建信息内容
         info_text = Text()
         info_text.append("\n")
         info_text.append("✨ 幻想乡 AI 角色扮演引擎 ✨\n", style="bold magenta")
@@ -138,12 +145,10 @@ class ConsoleBackend(BaseBackend):
         info_text.append("<cmd>help</cmd> ", style="bold cyan")
         info_text.append("查看所有命令\n", style="dim")
 
-        # 合并艺术字和信息
         full_content = Text()
         full_content.append(art_text)
         full_content.append(info_text)
 
-        # 显示面板
         self.console.print(
             Panel(
                 full_content,
@@ -183,21 +188,16 @@ class ConsoleBackend(BaseBackend):
         if not self._running or self.agent.is_shutting_down:
             return ""
 
-        # 🆕 使用新的命令执行器
         results, clean_text = await self.cmd_executor.execute(message, self._cmd_context)
 
-        # 处理命令结果
         if self._handle_command_results(results):
             return "__EXIT__"
 
-        # 如果没有纯文本内容，不发送给 AI
         if not clean_text:
             return ""
 
-        # 🆕 构建系统上下文列表
         system_contexts = self._build_system_contexts()
 
-        # 正常发送消息
         if self._use_stream and self.agent.config.model.stream:
             response = await self._send_stream(clean_text, system_contexts)
         else:
@@ -211,6 +211,8 @@ class ConsoleBackend(BaseBackend):
         first_chunk = True
 
         character_name = safe_get(self.agent.config, "character.name", "Assistant")
+
+        self._streaming_in_progress = True
 
         try:
             async for chunk in self.agent.send_stream(message, system_contexts):
@@ -243,6 +245,8 @@ class ConsoleBackend(BaseBackend):
 
         if not first_chunk:
             self.console.print()
+
+        self._streaming_in_progress = False
 
         return full_response
 
@@ -298,9 +302,17 @@ class ConsoleBackend(BaseBackend):
                 if tool_names:
                     logger.info(f"调用工具: {', '.join(tool_names)}")
 
+    # ==================== 生命周期 ====================
+
     async def stop(self) -> None:
         """停止"""
         self._running = False
+        if self._display_task:
+            self._display_task.cancel()
+            try:
+                await self._display_task
+            except asyncio.CancelledError:
+                pass
         await self.agent.shutdown()
         logger.info("控制台后端已停止")
 
@@ -317,28 +329,44 @@ class ConsoleBackend(BaseBackend):
         if element in self.colors:
             self.colors[element] = color
 
+    # ==================== 主动消息实时显示 ====================
+
     async def _on_initiative_message(self, event: Event) -> None:
-        """将主动消息放入队列"""
-        if self.agent.config.debug_silent_output:
-            await self._initiative_queue.put(event.data.get("message", ""))
+        """收到主动消息 - 放入队列"""
+        message = event.data.get("message", "")
+        if message:
+            await self._initiative_queue.put(message)
+
+    async def _display_initiative_loop(self) -> None:
+        """后台协程 - 实时显示队列中的主动消息"""
+        character_name = safe_get(self.agent.config, "character.name", "Unknown")
+
+        while self._running:
+            try:
+                msg = await asyncio.wait_for(self._initiative_queue.get(), timeout=0.5)
+            except asyncio.TimeoutError:
+                continue
+
+            # 不打断正在进行的流式输出
+            if self._streaming_in_progress:
+                # 放回去，等流式输出完成再显示
+                await self._initiative_queue.put(msg)
+                await asyncio.sleep(0.3)
+                continue
+
+            # 立即打印主动消息
+            self.console.print()
+            self.console.print(
+                f"[{self.colors['initiative']}]💭 {character_name}: {msg}[/]"
+            )
+
+    # ==================== 交互式主循环 ====================
 
     async def run_interactive(self) -> None:
         await self.start()
 
-        async def show_initiatives():
-            while self._running:
-                try:
-                    # 非阻塞等待，超时后继续循环
-                    msg = await asyncio.wait_for(self._initiative_queue.get(), timeout=0.5)
-                    if not self.agent.config.debug_silent_output:
-                        continue
-                    self.console.print()
-                    self.console.print(f"[dim]💭 角色想对你说：[/]")
-                    self._print_assistant_message(msg)
-                except asyncio.TimeoutError:
-                    pass
-
-        asyncio.create_task(show_initiatives())
+        # 启动主动消息显示协程
+        self._display_task = asyncio.create_task(self._display_initiative_loop())
 
         self.console.print("[dim]💡 输入 [/][bold cyan]<cmd>help</cmd>[/] [dim]查看所有命令[/]")
         self.console.print("[dim]💡 按 Ctrl+C 安全退出（会自动保存）[/]\n")
@@ -348,7 +376,6 @@ class ConsoleBackend(BaseBackend):
         try:
             while self._running and not self.agent.is_shutting_down:
                 try:
-                    # 🔧 修复：使用 asyncio.to_thread 把同步 input 放到线程池
                     user_input = await asyncio.to_thread(
                         Prompt.ask, f"[{self.colors['user']}]你[/]"
                     )
